@@ -48,11 +48,8 @@ class CryptoSignerImpl implements CryptoSigner {
         }
     }
 
-    /**
-     * PKCS#7 detached signature
-     */
     @Override
-    public byte[] sign(String textToSign) {
+    public byte[] signPkcs7Detached(String textToSign) {
         boolean detached = true;
         try {
             return cmsSign(textToSign.getBytes(StandardCharsets.UTF_8.name()), privateKey, certificate, detached);
