@@ -3,6 +3,7 @@ package cyclone.esia.authcode.dto;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
 
+import java.time.Instant;
 import java.time.LocalDate;
 
 /**
@@ -52,6 +53,9 @@ public class PersonalDataDto {
     @JsonFormat(pattern = "dd.MM.yyyy")
     private LocalDate birthDate; // dd.MM.yyyy
     private Gender gender; // M, F
+
+    @JsonFormat(shape = JsonFormat.Shape.NUMBER)
+    private Instant updatedOn;
 
     enum Gender {
         M, F
