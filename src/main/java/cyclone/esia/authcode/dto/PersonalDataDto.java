@@ -49,7 +49,6 @@ public class PersonalDataDto {
     private String inn;
     private String status;
 
-    //    private String birthDate; // dd.MM.yyyy
     @JsonFormat(pattern = "dd.MM.yyyy")
     private LocalDate birthDate; // dd.MM.yyyy
     private Gender gender; // M, F

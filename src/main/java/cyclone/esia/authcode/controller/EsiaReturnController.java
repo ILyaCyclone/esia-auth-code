@@ -3,10 +3,17 @@ package cyclone.esia.authcode.controller;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import cyclone.esia.authcode.EsiaProperties;
 import cyclone.esia.authcode.dto.*;
 import cyclone.esia.authcode.profile.Contacts;
 import cyclone.esia.authcode.service.EsiaAuthUrlService;
+import cyclone.esia.authcode.service.EsiaPublicKeyProvider;
 import cyclone.esia.authcode.service.PersonDataCollectionType;
+import io.jsonwebtoken.Header;
+import io.jsonwebtoken.Jwt;
+import io.jsonwebtoken.JwtParser;
+import io.jsonwebtoken.Jwts;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,8 +28,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 
+import javax.annotation.PostConstruct;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @RestController
 @RequiredArgsConstructor
@@ -30,10 +39,36 @@ public class EsiaReturnController {
     private static final Logger logger = LoggerFactory.getLogger(EsiaReturnController.class);
 
     private final EsiaAuthUrlService esiaAuthUrlService;
+    private final EsiaPublicKeyProvider esiaPublicKeyProvider;
+    private final EsiaProperties esiaProperties;
+
+
+    private JwtParser jwtParser;
+    private JwtHeaderCheck[] authorizationCodeChecks;
+    private JwtHeaderCheck[] accessTokenChecks;
 
     private final ObjectMapper objectMapper;
 
     private final RestTemplate restTemplate;
+
+    @PostConstruct
+    public void init() {
+        jwtParser = Jwts.parser().setSigningKey(esiaPublicKeyProvider.getPublicKey())
+                .requireIssuer(esiaProperties.getIssuer())
+                .require("client_id", esiaProperties.getClientId());
+
+        JwtHeaderCheck jwtTypeCheck = new JwtHeaderCheck("typ", "JWT");
+        JwtHeaderCheck jwtAlgCheck = new JwtHeaderCheck("alg", "RS256");
+
+        authorizationCodeChecks = new JwtHeaderCheck[]{jwtTypeCheck, jwtAlgCheck
+                , new JwtHeaderCheck("sbt", "authorization_code")
+        };
+
+        accessTokenChecks = new JwtHeaderCheck[]{jwtTypeCheck, jwtAlgCheck
+                , new JwtHeaderCheck("sbt", "access")
+        };
+    }
+
 
     @GetMapping(path = "/esia_return", produces = "text/plain")
     public String handleReturn(
@@ -47,6 +82,7 @@ public class EsiaReturnController {
         if (StringUtils.hasText(authorizationCode)) {
             joiner.add("сode=" + authorizationCode);
             tryJoinJWT(joiner, authorizationCode);
+            parseAndCheckJwt(authorizationCode, "Authorization code", authorizationCodeChecks);
         }
         if (StringUtils.hasText(error)) {
             joiner.add("error=" + error);
@@ -64,6 +100,7 @@ public class EsiaReturnController {
             AccessTokenDto accessTokenDto = esiaAuthUrlService.getAccessToken(authorizationCode);
             joiner.add("accessTokenDto=" + accessTokenDto);
             tryJoinJWT(joiner, accessTokenDto.getAccessToken());
+            parseAndCheckJwt(accessTokenDto.getAccessToken(), "Access token", accessTokenChecks);
 
             String jwtPayloadEncoded = accessTokenDto.getAccessToken().split("\\.")[1];
             byte[] jwtPayloadBytes = Base64Utils.decodeFromUrlSafeString(jwtPayloadEncoded);
@@ -77,6 +114,9 @@ public class EsiaReturnController {
 
             List<ContactDto> contactDtos = getCollection(oid, accessTokenDto, PersonDataCollectionType.CONTACTS, ContactDto.class);
             contactDtos.forEach(contactDto -> joiner.add(contactDto.toString()));
+
+
+
 
             Contacts contacts = mapToContacts(contactDtos);
             joiner.add(contacts.toString());
@@ -154,8 +194,8 @@ public class EsiaReturnController {
 
 
     private void validateCollectionElementUrl(String url) {
-        if(!url.matches("https?:\\/\\/(.*?\\.)?gosuslugi\\.ru($|\\/.+)")) {
-            throw new RuntimeException("Collection URL is not safe `"+url+'\'');
+        if (!url.matches("https?:\\/\\/(.+?\\.)?gosuslugi\\.ru($|\\/.+)")) {
+            throw new RuntimeException("Collection URL is not safe `" + url + '\'');
         }
     }
 
@@ -166,6 +206,45 @@ public class EsiaReturnController {
             joiner.add("try base64decode jwt");
             joiner.add(new String(Base64Utils.decodeFromUrlSafeString(jwtParts[0]), StandardCharsets.UTF_8));
             joiner.add(new String(Base64Utils.decodeFromUrlSafeString(jwtParts[1]), StandardCharsets.UTF_8));
+        }
+    }
+
+    private Jwt parseAndCheckJwt(String jwtString, String tokenTypeTitle, JwtHeaderCheck[] checks) {
+        Jwt jwt = jwtParser.parse(jwtString);
+
+        Header header = jwt.getHeader();
+//        Claims claims = (Claims) jwt.getBody();
+
+        performJwtHeaderChecks(header, tokenTypeTitle, checks);
+
+        return jwt;
+    }
+
+    private void performJwtHeaderChecks(Header header, String title, JwtHeaderCheck[] checks) {
+        List<JwtHeaderCheck> failedChecks = Arrays.stream(checks)
+                .filter(check -> !check.getExpectedValue().equals(check.apply(header)))
+                .collect(Collectors.toList());
+
+        if (!failedChecks.isEmpty()) {
+            String failedChecksMessage = failedChecks.stream()
+                    .map(check -> "\"" + check.getKey() + "\" value expected: \"" + check.getExpectedValue() + "\", actual: \"" + check.getActualValue() + '"')
+                    .collect(Collectors.joining("; "));
+            throw new RuntimeException(title + " checks failed: " + failedChecksMessage);
+        }
+    }
+
+    @RequiredArgsConstructor
+    @Getter
+    static class JwtHeaderCheck {
+        private final String key;
+        private final Object expectedValue;
+        private Object actualValue;
+
+        public Object apply(Header header) {
+            if (actualValue == null) {
+                actualValue = header.get(key);
+            }
+            return actualValue;
         }
     }
 
