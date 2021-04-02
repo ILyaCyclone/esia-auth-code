@@ -112,19 +112,21 @@ public class EsiaReturnController {
             PersonalDataDto personalData = getPersonalDataDto(oid, accessTokenDto);
             joiner.add(personalData.toString());
 
-            List<ContactDto> contactDtos = getCollection(oid, accessTokenDto, PersonDataCollectionType.CONTACTS, ContactDto.class);
+//            List<ContactDto> contactDtos = getCollection(oid, accessTokenDto, PersonDataCollectionType.CONTACTS, ContactDto.class);
+            List<ContactDto> contactDtos = getCollectionEmbedded(oid, accessTokenDto, PersonDataCollectionType.CONTACTS, ContactDto.class);
             contactDtos.forEach(contactDto -> joiner.add(contactDto.toString()));
-
 
 
 
             Contacts contacts = mapToContacts(contactDtos);
             joiner.add(contacts.toString());
 
-            List<AddressDto> addrs = getCollection(oid, accessTokenDto, PersonDataCollectionType.ADDRESSES, AddressDto.class);
+//            List<AddressDto> addrs = getCollection(oid, accessTokenDto, PersonDataCollectionType.ADDRESSES, AddressDto.class);
+            List<AddressDto> addrs = getCollectionEmbedded(oid, accessTokenDto, PersonDataCollectionType.ADDRESSES, AddressDto.class);
             addrs.forEach(addressDto -> joiner.add(addressDto.toString()));
 
-            List<DocumentDto> documentDtos = getCollection(oid, accessTokenDto, PersonDataCollectionType.DOCUMENTS, DocumentDto.class);
+//            List<DocumentDto> documentDtos = getCollection(oid, accessTokenDto, PersonDataCollectionType.DOCUMENTS, DocumentDto.class);
+            List<DocumentDto> documentDtos = getCollectionEmbedded(oid, accessTokenDto, PersonDataCollectionType.DOCUMENTS, DocumentDto.class);
             documentDtos.forEach(dto -> joiner.add(dto.toString()));
 
         }
@@ -192,6 +194,26 @@ public class EsiaReturnController {
         return results;
     }
 
+    private <T> List<T> getCollectionEmbedded(long oid, AccessTokenDto accessTokenDto, PersonDataCollectionType collectionType, Class<T> resultClass) throws JsonProcessingException {
+        String collectionUrl = "https://esia-portal1.test.gosuslugi.ru/rs/prns/" + oid + "/" + collectionType.urlPart() + "?embed=(elements)";
+        HttpHeaders httpHeaders = new HttpHeaders();
+        httpHeaders.add("Authorization", accessTokenDto.getTokenType() + " " + accessTokenDto.getAccessToken());
+        HttpEntity<String> requestEntity = new HttpEntity<>(httpHeaders);
+        ResponseEntity<String> collectionResponseEntity = restTemplate.exchange(collectionUrl, HttpMethod.GET, requestEntity, String.class);
+        String collectionResponseString = collectionResponseEntity.getBody(); //  {"stateFacts":["hasSize"],"size":1,"eTag":"93E882A620BEDE1884695515724C772A43278794","elements":["https://esia-portal1.test.gosuslugi.ru/rs/prns/1000299654/ctts/14434265"]}
+        logger.debug("getCollectionEmbedded collectionResponseString: {}", collectionResponseString);
+
+        List<T> results = new ArrayList<>();
+        Iterator<JsonNode> collectionElements = objectMapper.readTree(collectionResponseString).get("elements").elements();
+        while (collectionElements.hasNext()) {
+            JsonNode elementJsonNode = collectionElements.next();
+            T element = objectMapper.treeToValue(elementJsonNode, resultClass);
+
+            results.add(element);
+        }
+
+        return results;
+    }
 
     private void validateCollectionElementUrl(String url) {
         if (!url.matches("https?:\\/\\/(.+?\\.)?gosuslugi\\.ru($|\\/.+)")) {
