@@ -9,11 +9,8 @@ import cyclone.esia.authcode.profile.Contacts;
 import cyclone.esia.authcode.service.EsiaAuthUrlService;
 import cyclone.esia.authcode.service.EsiaPublicKeyProvider;
 import cyclone.esia.authcode.service.PersonDataCollectionType;
-import io.jsonwebtoken.Header;
-import io.jsonwebtoken.Jwt;
-import io.jsonwebtoken.JwtParser;
-import io.jsonwebtoken.Jwts;
-import lombok.Getter;
+import io.jsonwebtoken.*;
+import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,6 +29,8 @@ import javax.annotation.PostConstruct;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 @RestController
 @RequiredArgsConstructor
@@ -44,7 +43,6 @@ public class EsiaReturnController {
 
 
     private JwtParser jwtParser;
-    private JwtHeaderCheck[] authorizationCodeChecks;
     private JwtHeaderCheck[] accessTokenChecks;
 
     private final ObjectMapper objectMapper;
@@ -57,20 +55,15 @@ public class EsiaReturnController {
                 .requireIssuer(esiaProperties.getIssuer())
                 .require("client_id", esiaProperties.getClientId());
 
-        JwtHeaderCheck jwtTypeCheck = new JwtHeaderCheck("typ", "JWT");
-        JwtHeaderCheck jwtAlgCheck = new JwtHeaderCheck("alg", "RS256");
-
-        authorizationCodeChecks = new JwtHeaderCheck[]{jwtTypeCheck, jwtAlgCheck
-                , new JwtHeaderCheck("sbt", "authorization_code")
-        };
-
-        accessTokenChecks = new JwtHeaderCheck[]{jwtTypeCheck, jwtAlgCheck
+        accessTokenChecks = new JwtHeaderCheck[]{
+                new JwtHeaderCheck("typ", "JWT")
+                , new JwtHeaderCheck("alg", "RS256")
                 , new JwtHeaderCheck("sbt", "access")
         };
     }
 
 
-    @GetMapping(path = "/esia_return", produces = "text/plain")
+    @GetMapping(path = {"/esia_return", "/login/oauth2/code/esia"}, produces = "text/plain")
     public String handleReturn(
             @RequestParam(name = "code", required = false) String authorizationCode
             , @RequestParam(name = "error", required = false) String error
@@ -82,7 +75,6 @@ public class EsiaReturnController {
         if (StringUtils.hasText(authorizationCode)) {
             joiner.add("сode=" + authorizationCode);
             tryJoinJWT(joiner, authorizationCode);
-            parseAndCheckJwt(authorizationCode, "Authorization code", authorizationCodeChecks);
         }
         if (StringUtils.hasText(error)) {
             joiner.add("error=" + error);
@@ -100,12 +92,10 @@ public class EsiaReturnController {
             AccessTokenDto accessTokenDto = esiaAuthUrlService.getAccessToken(authorizationCode);
             joiner.add("accessTokenDto=" + accessTokenDto);
             tryJoinJWT(joiner, accessTokenDto.getAccessToken());
-            parseAndCheckJwt(accessTokenDto.getAccessToken(), "Access token", accessTokenChecks);
+//            Jwt<Header, Claims> accessTokenJwt = parseAndCheckJwt(accessTokenDto.getAccessToken(), "Access token", accessTokenChecks);
+            Jwt<Header, Claims> accessTokenJwt = parseAndCheckAccessTokenJwt(accessTokenDto.getAccessToken());
 
-            String jwtPayloadEncoded = accessTokenDto.getAccessToken().split("\\.")[1];
-            byte[] jwtPayloadBytes = Base64Utils.decodeFromUrlSafeString(jwtPayloadEncoded);
-            String jwtPayloadJsonString = new String(jwtPayloadBytes, StandardCharsets.UTF_8);
-            long oid = objectMapper.readTree(jwtPayloadJsonString).get("urn:esia:sbj_id").asLong();
+            long oid = accessTokenJwt.getBody().get("urn:esia:sbj_id", Long.class);
             logger.debug("oid: {}", oid);
 
 
@@ -170,8 +160,7 @@ public class EsiaReturnController {
 
 
     private <T> List<T> getCollection(long oid, AccessTokenDto accessTokenDto, PersonDataCollectionType collectionType, Class<T> resultClass) throws JsonProcessingException {
-        List<T> results = new ArrayList<>();
-        String collectionUrl = "https://esia-portal1.test.gosuslugi.ru/rs/prns/" + oid + "/" + collectionType.urlPart();
+        String collectionUrl = esiaProperties.getDataCollectionsUrl() + "/" + oid + "/" + collectionType.urlPart();
         HttpHeaders httpHeaders = new HttpHeaders();
         httpHeaders.add("Authorization", accessTokenDto.getTokenType() + " " + accessTokenDto.getAccessToken());
         HttpEntity<String> requestEntity = new HttpEntity<>(httpHeaders);
@@ -179,23 +168,28 @@ public class EsiaReturnController {
         String collectionResponseString = collectionResponseEntity.getBody(); //  {"stateFacts":["hasSize"],"size":1,"eTag":"93E882A620BEDE1884695515724C772A43278794","elements":["https://esia-portal1.test.gosuslugi.ru/rs/prns/1000299654/ctts/14434265"]}
         logger.debug("collectionResponseString: {}", collectionResponseString);
 
-        Iterator<JsonNode> collectionElements = objectMapper.readTree(collectionResponseString).get("elements").elements();
-        while (collectionElements.hasNext()) {
-            String elementUrl = collectionElements.next().asText();
-            validateCollectionElementUrl(elementUrl);
+        return iteratorToStream(objectMapper.readTree(collectionResponseString).get("elements").elements())
+                .map(collectionElement -> {
+                    String elementUrl = collectionElement.asText();
+                    validateCollectionElementUrl(elementUrl);
 
-            ResponseEntity<String> elementResponseEntity = restTemplate.exchange(elementUrl, HttpMethod.GET, requestEntity, String.class);
-            String elementResponseString = elementResponseEntity.getBody();
-            logger.debug(elementResponseString);
+                    ResponseEntity<String> elementResponseEntity = restTemplate.exchange(elementUrl, HttpMethod.GET, requestEntity, String.class);
+                    String elementResponseString = elementResponseEntity.getBody();
+                    logger.debug(elementResponseString);
 
-            T result = objectMapper.readValue(elementResponseString, resultClass);
-            results.add(result);
+                    return mapCollectionElement(elementResponseString, resultClass);
+                })
+                .collect(Collectors.toList());
+    }
+
+    private void validateCollectionElementUrl(String url) {
+        if (!url.matches("https?:\\/\\/(.+?\\.)?gosuslugi\\.ru($|\\/.+)")) {
+            throw new RuntimeException("Collection URL is not safe `" + url + '\'');
         }
-        return results;
     }
 
     private <T> List<T> getCollectionEmbedded(long oid, AccessTokenDto accessTokenDto, PersonDataCollectionType collectionType, Class<T> resultClass) throws JsonProcessingException {
-        String collectionUrl = "https://esia-portal1.test.gosuslugi.ru/rs/prns/" + oid + "/" + collectionType.urlPart() + "?embed=(elements)";
+        String collectionUrl = esiaProperties.getDataCollectionsUrl() + "/" + oid + "/" + collectionType.urlPart() + "?embed=(elements)";
         HttpHeaders httpHeaders = new HttpHeaders();
         httpHeaders.add("Authorization", accessTokenDto.getTokenType() + " " + accessTokenDto.getAccessToken());
         HttpEntity<String> requestEntity = new HttpEntity<>(httpHeaders);
@@ -203,21 +197,24 @@ public class EsiaReturnController {
         String collectionResponseString = collectionResponseEntity.getBody(); //  {"stateFacts":["hasSize"],"size":1,"eTag":"93E882A620BEDE1884695515724C772A43278794","elements":["https://esia-portal1.test.gosuslugi.ru/rs/prns/1000299654/ctts/14434265"]}
         logger.debug("getCollectionEmbedded collectionResponseString: {}", collectionResponseString);
 
-        List<T> results = new ArrayList<>();
-        Iterator<JsonNode> collectionElements = objectMapper.readTree(collectionResponseString).get("elements").elements();
-        while (collectionElements.hasNext()) {
-            JsonNode elementJsonNode = collectionElements.next();
-            T element = objectMapper.treeToValue(elementJsonNode, resultClass);
-
-            results.add(element);
-        }
-
-        return results;
+        return iteratorToStream(objectMapper.readTree(collectionResponseString).get("elements").elements())
+                .map(elementJsonNode -> mapCollectionElement(elementJsonNode, resultClass))
+                .collect(Collectors.toList());
     }
 
-    private void validateCollectionElementUrl(String url) {
-        if (!url.matches("https?:\\/\\/(.+?\\.)?gosuslugi\\.ru($|\\/.+)")) {
-            throw new RuntimeException("Collection URL is not safe `" + url + '\'');
+    private <T> T mapCollectionElement(String elementResponseString, Class<T> resultClass) {
+        try {
+            return objectMapper.readValue(elementResponseString, resultClass);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private <T> T mapCollectionElement(JsonNode elementJsonNode, Class<T> resultClass) {
+        try {
+            return objectMapper.treeToValue(elementJsonNode, resultClass);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -231,43 +228,46 @@ public class EsiaReturnController {
         }
     }
 
-    private Jwt parseAndCheckJwt(String jwtString, String tokenTypeTitle, JwtHeaderCheck[] checks) {
-        Jwt jwt = jwtParser.parse(jwtString);
-
+    private Jwt<Header, Claims> parseAndCheckAccessTokenJwt(String accessToken) {
+        Jwt<Header, Claims> jwt = jwtParser.parse(accessToken);
         Header header = jwt.getHeader();
-//        Claims claims = (Claims) jwt.getBody();
 
-        performJwtHeaderChecks(header, tokenTypeTitle, checks);
-
-        return jwt;
-    }
-
-    private void performJwtHeaderChecks(Header header, String title, JwtHeaderCheck[] checks) {
-        List<JwtHeaderCheck> failedChecks = Arrays.stream(checks)
-                .filter(check -> !check.getExpectedValue().equals(check.apply(header)))
+        List<JwtHeaderCheckResult> failedChecks = Stream.of(accessTokenChecks)
+                .map(check -> new JwtHeaderCheckResult(check, header.get(check.getKey())))
+                .filter(performedCheck -> !performedCheck.isPassed())
                 .collect(Collectors.toList());
 
         if (!failedChecks.isEmpty()) {
             String failedChecksMessage = failedChecks.stream()
-                    .map(check -> "\"" + check.getKey() + "\" value expected: \"" + check.getExpectedValue() + "\", actual: \"" + check.getActualValue() + '"')
+                    .map(check -> "Expected '" + check.getJwtHeaderCheck().getKey() + "' header to be: '" + check.getJwtHeaderCheck().getExpectedValue()
+                            + "', but was: '" + check.getActualValue() + '\'')
                     .collect(Collectors.joining("; "));
-            throw new RuntimeException(title + " checks failed: " + failedChecksMessage);
+            throw new JwtException("Access token check failed: " + failedChecksMessage);
         }
+
+        return jwt;
     }
 
-    @RequiredArgsConstructor
-    @Getter
+    private <T> Stream<T> iteratorToStream(Iterator<T> iterator) {
+        boolean parallel = false;
+        return StreamSupport.stream(Spliterators.spliteratorUnknownSize(iterator, Spliterator.ORDERED), parallel);
+    }
+
+
+
+    @Data
     static class JwtHeaderCheck {
         private final String key;
         private final Object expectedValue;
-        private Object actualValue;
-
-        public Object apply(Header header) {
-            if (actualValue == null) {
-                actualValue = header.get(key);
-            }
-            return actualValue;
-        }
     }
 
+    @Data
+    static class JwtHeaderCheckResult {
+        private final JwtHeaderCheck jwtHeaderCheck;
+        private final Object actualValue;
+
+        boolean isPassed() {
+            return Objects.equals(jwtHeaderCheck.getExpectedValue(), actualValue);
+        }
+    }
 }

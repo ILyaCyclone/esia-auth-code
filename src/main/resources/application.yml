@@ -1,21 +1,26 @@
 server.port: 8080
 
 esia:
-  auth-code-url: https://esia-portal1.test.gosuslugi.ru/aas/oauth2/ac
-  access-token-url: https://esia-portal1.test.gosuslugi.ru/aas/oauth2/te
-#  auth-code-url: https://esia.gosuslugi.ru/aas/oauth2/ac
-#  access-token-url: https://esia.gosuslugi.ru/aas/oauth2/te
+  base-url: https://esia-portal1.test.gosuslugi.ru
+  #  base-url: https://esia.gosuslugi.ru
+  auth-code-url: ${esia.base-url}/aas/oauth2/ac
+  access-token-url: ${esia.base-url}/aas/oauth2/te
+  data-collections-url: ${esia.base-url}/rs/prns
+
+  issuer: http://esia-portal1.test.gosuslugi.ru/
+  #file path to ESIA public certificate for JWT verification
+  certificate-path: ${ESIA_CERTIFICATE_PATH}
+
+
   client-id: ${ESIA_CLIENT_ID}
-  return-url: http://localhost:${server.port}/esia_return
-#  return-url: http://10.242.101.40:${server.port}/esia_return
+  return-url: http://localhost:${server.port}/login/oauth2/code/esia
+  #  return-url: http://localhost:${server.port}/esia_return
+  #  return-url: http://10.242.101.40:${server.port}/esia_return
 
   keystore-alias: ${ESIA_KEYSTORE_ALIAS}
   keystore-password: ${ESIA_PRIVATE_KEY_PASSWORD}
 
 
-  issuer: http://esia-portal1.test.gosuslugi.ru/
-  #file path to ESIA public certificate for JWT verification
-  certificate-path: ${ESIA_CERTIFICATE_PATH}
 
 
 
