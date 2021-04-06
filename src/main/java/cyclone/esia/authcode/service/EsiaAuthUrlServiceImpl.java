@@ -2,7 +2,6 @@ package cyclone.esia.authcode.service;
 
 import cyclone.esia.authcode.EsiaProperties;
 import cyclone.esia.authcode.dto.AccessTokenDto;
-import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -23,31 +22,46 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @Service
-@RequiredArgsConstructor
 class EsiaAuthUrlServiceImpl implements EsiaAuthUrlService {
     private static final Logger logger = LoggerFactory.getLogger(EsiaAuthUrlServiceImpl.class);
-
-    private final CryptoSigner cryptoSigner;
-    private final EsiaProperties esiaProperties;
 
     private final DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm:ss Z")
             .withZone(ZoneId.systemDefault());
 
-    private static final String accessType = "offline"; // "online";
-    private static final Scope[] scopes = {Scope.FULLNAME, Scope.GENDER, Scope.BIRTHDATE
-            , Scope.BIRTHPLACE, Scope.BIRTH_CERT_DOC, Scope.CONTACTS, Scope.INN, Scope.SNILS, Scope.RESIDENCE_DOC
-            , Scope.TEMPORARY_RESIDENCE_DOC
-            , Scope.ID_DOC, Scope.TEMPORARY_RESIDENCE_DOC
-//            , Scope.FOREIGN_PASSPORT_DOC // -> ESIA-007019: OAuthErrorEnum.noGrants
-    };
-//    private final String scope = "fullname foreign_passport_doc"; // -> ESIA-007019: OAuthErrorEnum.noGrants
+    private final CryptoSigner cryptoSigner;
+    private final EsiaProperties esiaProperties;
 
-    private final String scope = Stream.of(scopes).map(streamScope -> streamScope.toString().toLowerCase()).collect(Collectors.joining(" "));
 
-    private static final String responseType = "code";
+    private final String scope;
+    private final UriComponentsBuilder baseAuthCodeUriBuilder;
+    private final MultiValueMap<String, String> baseAccessTokenRequestBody;
 
-    private static final String accessGrantType = "authorization_code";
-    private static final String accessTokenType = "Bearer";
+    EsiaAuthUrlServiceImpl(CryptoSigner cryptoSigner, EsiaProperties esiaProperties) {
+        this.cryptoSigner = cryptoSigner;
+        this.esiaProperties = esiaProperties;
+
+        Scope[] scopes = {Scope.FULLNAME, Scope.GENDER, Scope.BIRTHDATE
+                , Scope.BIRTHPLACE, Scope.BIRTH_CERT_DOC, Scope.CONTACTS, Scope.INN, Scope.SNILS, Scope.RESIDENCE_DOC
+                , Scope.TEMPORARY_RESIDENCE_DOC
+                , Scope.ID_DOC, Scope.TEMPORARY_RESIDENCE_DOC
+        };
+        scope = Stream.of(scopes).map(streamScope -> streamScope.toString().toLowerCase()).collect(Collectors.joining(" "));
+
+
+        baseAuthCodeUriBuilder = UriComponentsBuilder.fromHttpUrl(esiaProperties.getAuthCodeUrl())
+                .queryParam("client_id", esiaProperties.getClientId())
+                .queryParam("scope", scope)
+                .queryParam("response_type", "code")
+                .queryParam("access_type", "offline"); // "offline" or "online"
+
+
+        baseAccessTokenRequestBody = new LinkedMultiValueMap<>();
+        baseAccessTokenRequestBody.add("client_id", esiaProperties.getClientId());
+        baseAccessTokenRequestBody.add("grant_type", "authorization_code");
+        baseAccessTokenRequestBody.add("scope", scope);
+        baseAccessTokenRequestBody.add("token_type", "Bearer");
+        baseAccessTokenRequestBody.add("redirect_uri", urlEncode(esiaProperties.getReturnUrl()));
+    }
 
 
     @Override
@@ -58,15 +72,11 @@ class EsiaAuthUrlServiceImpl implements EsiaAuthUrlService {
             String state = generateState();
             String clientSecret = generateClientSecret(scope, timestamp, clientId, state);
 
-            UriComponentsBuilder accessTokenRequestBuilder = UriComponentsBuilder.fromHttpUrl(esiaProperties.getAuthCodeUrl())
-                    .queryParam("client_id", clientId)
+            UriComponentsBuilder authCodeUriBuilder = baseAuthCodeUriBuilder.cloneBuilder()
                     .queryParam("client_secret", clientSecret)
-                    .queryParam("scope", scope)
-                    .queryParam("response_type", responseType)
-                    .queryParam("state", state)
-                    .queryParam("access_type", accessType);
+                    .queryParam("state", state);
 
-            String url = accessTokenRequestBuilder.toUriString();
+            String url = authCodeUriBuilder.toUriString();
             url += "&timestamp=" + urlEncode(timestamp);
             url += "&redirect_uri=" + urlEncode(esiaProperties.getReturnUrl());
 
@@ -87,10 +97,10 @@ class EsiaAuthUrlServiceImpl implements EsiaAuthUrlService {
      * доступа;
      *  <client_secret> – подпись запроса в формате PKCS#7 detached signature в кодировке UTF8 от значений четырех
      * параметров HTTP–запроса: scope, timestamp, clientId, state (без разделителей). <client_secret> должен быть
-     * закодирован в формате base64 url safe. Используемый для проверки подписи сертификат должен быть
-     * предварительно зарегистрирован в ЕСИА и привязан к учетной записи системы-клиента в ЕСИА. ЕСИА поддерживает
-     * сертификаты в формате X.509. ЕСИА поддерживает алгоритм формирования электронной подписи ГОСТ Р 34.10-2012 и
-     * алгоритм криптографического хэширования ГОСТ Р 34.11-2012.
+     * закодирован в формате base64 url safe. Используемый для проверки подписи сертификат должен быть предварительно
+     * зарегистрирован в ЕСИА и привязан к учетной записи системы-клиента в ЕСИА. ЕСИА поддерживает сертификаты в
+     * формате X.509. ЕСИА поддерживает алгоритм формирования электронной подписи ГОСТ Р 34.10-2012 и алгоритм
+     * криптографического хэширования ГОСТ Р 34.11-2012.
      *  <state> – набор случайных символов, имеющий вид 128-битного идентификатора запроса (необходимо для защиты от
      * перехвата), генерируется по стандарту UUID; этот набор символов должен отличаться от того, который
      * использовался при получении авторизационного кода;
@@ -98,11 +108,10 @@ class EsiaAuthUrlServiceImpl implements EsiaAuthUrlService {
      * доступ (то же самое значение, которое было указано в запросе на получение авторизационного кода);
      *  <scope> – область доступа, т.е. запрашиваемые права (то же самое значение, которое было указано в запросе на
      * получение авторизационного кода);
-     *  <timestamp> – время запроса маркера в формате yyyy.MM.dd HH:mm:ss Z (например,
-     * 2013.01.25 14:36:11 +0400), необходимое для фиксации начала временного промежутка, в
-     * течение которого будет валиден запрос с данным идентификатором (<state>);
-     *  <token_type> – тип запрашиваемого маркера, в настоящее время ЕСИА поддерживает
-     * только значение “Bearer
+     *  <timestamp> – время запроса маркера в формате yyyy.MM.dd HH:mm:ss Z (например, 2013.01.25 14:36:11 +0400),
+     * необходимое для фиксации начала временного промежутка, в течение которого будет валиден запрос с данным
+     * идентификатором (<state>);
+     *  <token_type> – тип запрашиваемого маркера, в настоящее время ЕСИА поддерживает только значение “Bearer
      */
     @Override
     public AccessTokenDto getAccessToken(String authenticationCode) {
@@ -112,18 +121,11 @@ class EsiaAuthUrlServiceImpl implements EsiaAuthUrlService {
             String timestamp = generateTimestamp();
             String clientSecret = generateClientSecret(scope, timestamp, clientId, state);
 
-            String redirectUrlEncoded = urlEncode(esiaProperties.getReturnUrl());
-
-            MultiValueMap<String, String> postBody = new LinkedMultiValueMap<>();
-            postBody.add("client_id", clientId);
+            MultiValueMap<String, String> postBody = new LinkedMultiValueMap<>(baseAccessTokenRequestBody);
             postBody.add("code", authenticationCode);
-            postBody.add("grant_type", accessGrantType);
             postBody.add("client_secret", clientSecret);
             postBody.add("state", state);
-            postBody.add("scope", scope);
-            postBody.add("token_type", accessTokenType);
             postBody.add("timestamp", timestamp);
-            postBody.add("redirect_uri", redirectUrlEncoded);
 
             logger.debug("access token post body parameters: {}", postBody);
             AccessTokenDto accessTokenDto = new RestTemplate().postForObject(esiaProperties.getAccessTokenUrl(), postBody, AccessTokenDto.class);
@@ -139,8 +141,12 @@ class EsiaAuthUrlServiceImpl implements EsiaAuthUrlService {
     }
 
 
-    private String urlEncode(String string) throws UnsupportedEncodingException {
-        return URLEncoder.encode(string, StandardCharsets.UTF_8.name());
+    private String urlEncode(String string) {
+        try {
+            return URLEncoder.encode(string, StandardCharsets.UTF_8.name());
+        } catch (UnsupportedEncodingException e) {
+            throw new EsiaAuthUrlServiceException("Could not encode string '" + string + '\'', e);
+        }
     }
 
 
