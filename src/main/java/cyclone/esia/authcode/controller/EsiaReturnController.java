@@ -151,7 +151,7 @@ public class EsiaReturnController {
         httpHeaders.add("Authorization", accessTokenDto.getTokenType() + " " + accessTokenDto.getAccessToken());
         HttpEntity<String> requestEntity = new HttpEntity<>(httpHeaders);
 
-        String url = "https://esia-portal1.test.gosuslugi.ru/rs/prns/" + oid;
+        String url = esiaProperties.getDataCollectionsUrl() + "/" + oid;
         ResponseEntity<String> personalDataResponse = restTemplate.exchange(url, HttpMethod.GET, requestEntity, String.class);
         PersonalDataDto personalData = objectMapper.readValue(personalDataResponse.getBody(), PersonalDataDto.class);
 

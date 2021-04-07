@@ -19,5 +19,5 @@ public class EsiaProperties {
     private final String returnUrl;
 
     private final String keystoreAlias;
-    private final String privateKeyPassword;
+    private final String keystorePassword;
 }

@@ -2,6 +2,8 @@ package cyclone.esia.authcode.service;
 
 import com.objsys.asn1j.runtime.*;
 import cyclone.esia.authcode.EsiaProperties;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import ru.CryptoPro.JCP.ASN.CryptographicMessageSyntax.*;
 import ru.CryptoPro.JCP.ASN.PKIX1Explicit88.CertificateSerialNumber;
@@ -22,6 +24,7 @@ import java.security.cert.X509Certificate;
  */
 @Service
 class CryptoSignerImpl implements CryptoSigner {
+    private static final Logger logger = LoggerFactory.getLogger(CryptoSignerImpl.class);
 
     private final PrivateKey privateKey;
     private final Certificate certificate;
@@ -38,10 +41,18 @@ class CryptoSignerImpl implements CryptoSigner {
             KeyStore keyStore = KeyStore.getInstance(JCP.HD_STORE_NAME);
             keyStore.load(null, null); // loads from system-wide CryptoPro container
 
-            privateKey = (PrivateKey) keyStore.getKey(esiaProperties.getKeystoreAlias()
-                    , esiaProperties.getPrivateKeyPassword().toCharArray());
+            if (keyStore.size() == 0) throw new CryptoSignerException("KeyStore is empty");
 
+            String keystoreAlias = esiaProperties.getKeystoreAlias();
+            char[] keystorePassword = esiaProperties.getKeystorePassword().toCharArray();
+
+            privateKey = (PrivateKey) keyStore.getKey(keystoreAlias, keystorePassword);
             certificate = keyStore.getCertificate(esiaProperties.getKeystoreAlias());
+
+            if (privateKey == null)
+                throw new CryptoSignerException("KeyStore private key by alias '" + keystoreAlias + "' doesn't exist");
+            if (certificate == null)
+                throw new CryptoSignerException("KeyStore public certificate by alias '" + keystoreAlias + "' doesn't exist");
 
         } catch (Exception e) {
             throw new CryptoSignerException("Unable to create " + CryptoSignerImpl.class.getSimpleName(), e);
@@ -54,12 +65,17 @@ class CryptoSignerImpl implements CryptoSigner {
         try {
             return cmsSign(textToSign.getBytes(StandardCharsets.UTF_8.name()), privateKey, certificate, detached);
         } catch (Exception e) {
-            throw new CryptoSignerException("Unable to sign '" + textToSign.substring(0, 50) + '\'', e);
+            throw new CryptoSignerException("Unable to sign '"
+                    + (textToSign.length() <= 200 ? textToSign : textToSign.substring(0, 188) + "…(truncated)")
+                    + '\'', e);
         }
     }
 
 
-
+    /**
+     * Cryptographic Message Syntax (CMS)
+     * https://tools.ietf.org/html/rfc5652
+     */
     private byte[] cmsSign(byte[] data, PrivateKey key, Certificate cert, boolean detached) throws Exception {
         Signature signature = Signature.getInstance(JCP.GOST_SIGN_2012_256_NAME);
 

@@ -18,7 +18,7 @@ esia:
   #  return-url: http://10.242.101.40:${server.port}/esia_return
 
   keystore-alias: ${ESIA_KEYSTORE_ALIAS}
-  keystore-password: ${ESIA_PRIVATE_KEY_PASSWORD}
+  keystore-password: ${ESIA_KEYSTORE_PASSWORD}
 
 
 
