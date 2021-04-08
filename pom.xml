@@ -8,10 +8,12 @@
     <version>2.4.2</version>
     <relativePath/> <!-- lookup parent from repository -->
   </parent>
+
   <groupId>cyclone.esia</groupId>
   <artifactId>esia-auth-code</artifactId>
   <version>0.0.1-SNAPSHOT</version>
   <name>esia-auth-code</name>
+  <packaging>war</packaging>
   <properties>
     <java.version>1.8</java.version>
 
@@ -43,6 +45,12 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-web</artifactId>
     </dependency>
+    <!-- for weblogic deployment -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-tomcat</artifactId>
+      <scope>provided</scope>
+    </dependency>
 
     <dependency>
       <groupId>org.springframework.boot</groupId>
@@ -64,6 +72,8 @@
   </dependencies>
 
   <build>
+    <finalName>aa_esia</finalName>
+
     <plugins>
       <plugin>
         <groupId>org.springframework.boot</groupId>
