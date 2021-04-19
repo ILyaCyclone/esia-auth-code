@@ -32,12 +32,23 @@
 <!--      <groupId>io.jsonwebtoken</groupId>-->
 <!--      <artifactId>jjwt-impl</artifactId>-->
 <!--      <version>${jjwt.version}</version>-->
-<!--    </dependency>-->
+    <!--    </dependency>-->
 
     <dependency>
       <groupId>io.jsonwebtoken</groupId>
       <artifactId>jjwt</artifactId>
       <version>${jjwt.version}</version>
+    </dependency>
+
+
+    <!--    <dependency>-->
+    <!--      <groupId>com.fasterxml.jackson.dataformat</groupId>-->
+    <!--      <artifactId>jackson-dataformat-xml</artifactId>-->
+    <!--    </dependency>-->
+    <dependency>
+      <groupId>com.fasterxml.jackson.dataformat</groupId>
+      <artifactId>jackson-dataformat-xml</artifactId>
+      <version>2.11.4</version>
     </dependency>
 
 

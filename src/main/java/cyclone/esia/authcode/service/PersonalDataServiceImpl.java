@@ -80,6 +80,14 @@ public class PersonalDataServiceImpl implements PersonalDataService {
         return personalData;
     }
 
+    @Override
+    public JsonNode getPersonalDataAsJsonNode(long oid, AccessTokenDto accessTokenDto) throws JsonProcessingException {
+        String url = esiaProperties.getDataCollectionsUrl() + "/" + oid;
+        ResponseEntity<String> personalDataResponse = restTemplate.exchange(url, HttpMethod.GET
+                , authorizationRequestEntity(accessTokenDto), String.class);
+        return objectMapper.readTree(personalDataResponse.getBody());
+    }
+
 
     @Override
     public <T> List<T> getCollection(long oid, AccessTokenDto accessTokenDto, PersonDataCollectionType collectionType, Class<T> resultClass) throws JsonProcessingException {
@@ -116,6 +124,19 @@ public class PersonalDataServiceImpl implements PersonalDataService {
 
         return iteratorToStream(objectMapper.readTree(collectionResponseString).get("elements").elements())
                 .map(elementJsonNode -> mapCollectionElement(elementJsonNode, resultClass))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<JsonNode> getCollectionEmbeddedAsJsonNodes(long oid, AccessTokenDto accessTokenDto, PersonDataCollectionType collectionType) throws JsonProcessingException {
+        ResponseEntity<String> collectionResponseEntity = restTemplate.exchange(dataCollectionsEmbeddedUriTemplate
+                , HttpMethod.GET, authorizationRequestEntity(accessTokenDto), String.class
+                , oid, collectionType.urlPart());
+
+        String collectionResponseString = collectionResponseEntity.getBody();
+        logger.debug("getCollectionEmbedded collectionResponseString: {}", collectionResponseString);
+
+        return iteratorToStream(objectMapper.readTree(collectionResponseString).get("elements").elements())
                 .collect(Collectors.toList());
     }
 

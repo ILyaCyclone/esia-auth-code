@@ -2,11 +2,12 @@ package cyclone.esia.authcode.controller;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import cyclone.esia.authcode.EsiaProperties;
 import cyclone.esia.authcode.dto.*;
 import cyclone.esia.authcode.profile.Contacts;
-import cyclone.esia.authcode.service.EsiaAuthUrlService;
+import cyclone.esia.authcode.profile.JsonNodeProfile;
+import cyclone.esia.authcode.service.EsiaAccessService;
 import cyclone.esia.authcode.service.EsiaPublicKeyProvider;
 import cyclone.esia.authcode.service.PersonDataCollectionType;
 import cyclone.esia.authcode.service.PersonalDataServiceImpl;
@@ -41,7 +42,7 @@ public class EsiaReturnController {
 
     private JwtParser jwtParser;
 
-    private final ObjectMapper objectMapper;
+    private final XmlMapper xmlMapper;
 
     private final JwtHeaderCheck[] accessTokenChecks = new JwtHeaderCheck[]{
             new JwtHeaderCheck("typ", "JWT")
@@ -114,6 +115,26 @@ public class EsiaReturnController {
             List<DocumentDto> documentDtos = personalDataService.getCollectionEmbedded(oid, accessTokenDto, PersonDataCollectionType.DOCUMENTS, DocumentDto.class);
             documentDtos.forEach(dto -> joiner.add(dto.toString()));
 
+//            Profile profile = new Profile(personalData, addrs, contactDtos, documentDtos);
+//            String profileXml = xmlMapper.writeValueAsString(profile);
+//            logger.debug("profileXml: {}", profileXml);
+
+
+            JsonNode personalDataJsonNode = personalDataService.getPersonalDataAsJsonNode(oid, accessTokenDto);
+            List<JsonNode> contactsJsonNode = personalDataService.getCollectionEmbeddedAsJsonNodes(oid, accessTokenDto, PersonDataCollectionType.CONTACTS);
+            List<JsonNode> addressesJsonNode = personalDataService.getCollectionEmbeddedAsJsonNodes(oid, accessTokenDto, PersonDataCollectionType.ADDRESSES);
+            List<JsonNode> documentsJsonNode = personalDataService.getCollectionEmbeddedAsJsonNodes(oid, accessTokenDto, PersonDataCollectionType.DOCUMENTS);
+
+            JsonNodeProfile jsonNodeProfile = new JsonNodeProfile(personalDataJsonNode, addressesJsonNode
+                    , contactsJsonNode, documentsJsonNode);
+
+//            String jsonNodexml = xmlMapper.writeValueAsString(jsonNodeProfile);
+            String jsonNodexml = xmlMapper.writerWithDefaultPrettyPrinter().writeValueAsString(jsonNodeProfile);
+
+            logger.debug("jsonNodexml: {}", jsonNodexml);
+
+            joiner.add("xml:");
+            joiner.add(jsonNodexml);
         }
 
         return joiner.toString();
