@@ -22,8 +22,8 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @Service
-class EsiaAuthUrlServiceImpl implements EsiaAuthUrlService {
-    private static final Logger logger = LoggerFactory.getLogger(EsiaAuthUrlServiceImpl.class);
+class EsiaAccessServiceImpl implements EsiaAccessService {
+    private static final Logger logger = LoggerFactory.getLogger(EsiaAccessServiceImpl.class);
 
     private final DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm:ss Z")
             .withZone(ZoneId.systemDefault());
@@ -36,7 +36,7 @@ class EsiaAuthUrlServiceImpl implements EsiaAuthUrlService {
     private final UriComponentsBuilder baseAuthCodeUriBuilder;
     private final MultiValueMap<String, String> baseAccessTokenRequestBody;
 
-    EsiaAuthUrlServiceImpl(CryptoSigner cryptoSigner, EsiaProperties esiaProperties) {
+    EsiaAccessServiceImpl(CryptoSigner cryptoSigner, EsiaProperties esiaProperties) {
         this.cryptoSigner = cryptoSigner;
         this.esiaProperties = esiaProperties;
 
@@ -84,7 +84,7 @@ class EsiaAuthUrlServiceImpl implements EsiaAuthUrlService {
 
             return url;
         } catch (Exception e) {
-            throw new EsiaAuthUrlServiceException("Unable to generate access token url", e);
+            throw new EsiaAccessException("Unable to generate access token url", e);
         }
     }
 
@@ -136,7 +136,7 @@ class EsiaAuthUrlServiceImpl implements EsiaAuthUrlService {
 
             return accessTokenDto;
         } catch (Exception e) {
-            throw new EsiaAuthUrlServiceException("Unable to get access token for authorization code '" + authenticationCode + '\'', e);
+            throw new EsiaAccessException("Unable to get access token for authorization code '" + authenticationCode + '\'', e);
         }
     }
 
@@ -145,7 +145,7 @@ class EsiaAuthUrlServiceImpl implements EsiaAuthUrlService {
         try {
             return URLEncoder.encode(string, StandardCharsets.UTF_8.name());
         } catch (UnsupportedEncodingException e) {
-            throw new EsiaAuthUrlServiceException("Could not encode string '" + string + '\'', e);
+            throw new EsiaAccessException("Could not encode string '" + string + '\'', e);
         }
     }
 

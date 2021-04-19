@@ -1,6 +1,6 @@
 package cyclone.esia.authcode.controller;
 
-import cyclone.esia.authcode.service.EsiaAuthUrlService;
+import cyclone.esia.authcode.service.EsiaAccessService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 @RequiredArgsConstructor
 public class RedirectLoginController {
 
-    private final EsiaAuthUrlService esiaAuthUrlService;
+    private final EsiaAccessService esiaAuthUrlService;
 
     @GetMapping("/oauth/esia")
     public String redirectEsiaAuth() {
