@@ -38,6 +38,7 @@ class CryptoSignerImpl implements CryptoSigner {
 
     public CryptoSignerImpl(EsiaProperties esiaProperties) {
         try {
+//            HDImageStore.setDir("path"); // set non-standard path
             KeyStore keyStore = KeyStore.getInstance(JCP.HD_STORE_NAME);
             keyStore.load(null, null); // loads from system-wide CryptoPro container
 
@@ -45,6 +46,7 @@ class CryptoSignerImpl implements CryptoSigner {
 
             String keystoreAlias = esiaProperties.getKeystoreAlias();
             char[] keystorePassword = esiaProperties.getKeystorePassword().toCharArray();
+//            char[] keystorePassword = esiaProperties.getKeystorePassword();
 
             privateKey = (PrivateKey) keyStore.getKey(keystoreAlias, keystorePassword);
             certificate = keyStore.getCertificate(esiaProperties.getKeystoreAlias());
@@ -96,7 +98,7 @@ class CryptoSignerImpl implements CryptoSigner {
         a.parameters = new Asn1Null();
         cms.digestAlgorithms.elements[0] = a;
         if (detached) {
-            cms.encapContentInfo = new EncapsulatedContentInfo(new Asn1ObjectIdentifier((new OID("1.2.840.113549.1.7.1")).value), (Asn1OctetString) null);
+            cms.encapContentInfo = new EncapsulatedContentInfo(new Asn1ObjectIdentifier((new OID("1.2.840.113549.1.7.1")).value), null);
         } else {
             cms.encapContentInfo = new EncapsulatedContentInfo(new Asn1ObjectIdentifier((new OID("1.2.840.113549.1.7.1")).value), new Asn1OctetString(buffer));
         }

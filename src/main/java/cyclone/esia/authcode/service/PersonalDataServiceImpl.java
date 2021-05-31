@@ -3,11 +3,13 @@ package cyclone.esia.authcode.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import cyclone.esia.authcode.EsiaProperties;
 import cyclone.esia.authcode.dto.AccessTokenDto;
 import cyclone.esia.authcode.dto.ContactDto;
 import cyclone.esia.authcode.dto.PersonalDataDto;
 import cyclone.esia.authcode.profile.Contacts;
+import cyclone.esia.authcode.profile.ProfileJsonNode;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +37,7 @@ public class PersonalDataServiceImpl implements PersonalDataService {
     private final EsiaProperties esiaProperties;
 
     private final ObjectMapper objectMapper;
+    private final XmlMapper xmlMapper;
     private final RestTemplate restTemplate;
 
     private String dataCollectionsUriTemplate;
@@ -139,6 +142,29 @@ public class PersonalDataServiceImpl implements PersonalDataService {
         return iteratorToStream(objectMapper.readTree(collectionResponseString).get("elements").elements())
                 .collect(Collectors.toList());
     }
+
+    @Override
+    public String getProfileXml(long oid, AccessTokenDto accessTokenDto) {
+        try {
+            JsonNode personalDataJsonNode = getPersonalDataAsJsonNode(oid, accessTokenDto);
+            List<JsonNode> contactsJsonNode = getCollectionEmbeddedAsJsonNodes(oid, accessTokenDto, PersonDataCollectionType.CONTACTS);
+            List<JsonNode> addressesJsonNode = getCollectionEmbeddedAsJsonNodes(oid, accessTokenDto, PersonDataCollectionType.ADDRESSES);
+            List<JsonNode> documentsJsonNode = getCollectionEmbeddedAsJsonNodes(oid, accessTokenDto, PersonDataCollectionType.DOCUMENTS);
+
+            ProfileJsonNode profileJsonNode = new ProfileJsonNode(personalDataJsonNode, addressesJsonNode
+                    , contactsJsonNode, documentsJsonNode);
+
+//            String jsonNodexml = xmlMapper.writeValueAsString(jsonNodeProfile);
+            String profileXml = xmlMapper.writerWithDefaultPrettyPrinter().writeValueAsString(profileJsonNode);
+            return profileXml;
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+
 
     private void validateCollectionElementUrl(String url) {
         if (!url.matches("https?:\\/\\/(.+?\\.)?gosuslugi\\.ru($|\\/.+)")) {

@@ -22,4 +22,6 @@ public interface PersonalDataService {
     JsonNode getPersonalDataAsJsonNode(long oid, AccessTokenDto accessTokenDto) throws JsonProcessingException;
 
     List<JsonNode> getCollectionEmbeddedAsJsonNodes(long oid, AccessTokenDto accessTokenDto, PersonDataCollectionType collectionType) throws JsonProcessingException;
+
+    String getProfileXml(long oid, AccessTokenDto accessTokenDto);
 }

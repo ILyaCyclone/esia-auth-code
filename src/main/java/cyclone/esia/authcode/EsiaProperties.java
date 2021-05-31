@@ -20,4 +20,6 @@ public class EsiaProperties {
 
     private final String keystoreAlias;
     private final String keystorePassword;
+
+    private final String cabinetRedirectUrl;
 }

@@ -20,9 +20,16 @@ esia:
   keystore-alias: ${ESIA_KEYSTORE_ALIAS}
   keystore-password: ${ESIA_KEYSTORE_PASSWORD}
 
+  cabinet-redirect-url: http://127.0.0.1:7101/CabinetMain-CabinetViewController-context-root/token_auth_callback
 
 
 
+spring:
+  datasource:
+    url: ${esia.db.url:jdbc:oracle:thin:@(DESCRIPTION=(ADDRESS_LIST=(ADDRESS=(PROTOCOL=TCP)(HOST=${esia.db.host:db2.miit.ru})(PORT=${esia.db.port:1521})))(CONNECT_DATA=(SERVICE_NAME=${esia.db.name:cgeneral.miit.ru})))}
+    username: ${esia.db.username:wlapp_u2_my}
+    password: ${esia.db.password}
+    driver-class-name: oracle.jdbc.OracleDriver
 
 logging.level:
   cyclone: DEBUG

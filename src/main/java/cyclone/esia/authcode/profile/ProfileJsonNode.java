@@ -10,7 +10,7 @@ import java.util.List;
 
 @Data
 @JacksonXmlRootElement(localName = "profile")
-public class JsonNodeProfile {
+public class ProfileJsonNode {
     private final JsonNode personalData;
 
     @JacksonXmlElementWrapper(localName = "addresses")
