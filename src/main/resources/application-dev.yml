@@ -32,4 +32,4 @@ spring:
     driver-class-name: oracle.jdbc.OracleDriver
 
 logging.level:
-  cyclone: DEBUG
+  ru.unisuite.identity: DEBUG
