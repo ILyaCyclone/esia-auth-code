@@ -8,7 +8,7 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
 
 @Configuration
-public class MapperConfig {
+public class JacksonConfig {
 
     @Bean
     public XmlMapper xmlMapper() {

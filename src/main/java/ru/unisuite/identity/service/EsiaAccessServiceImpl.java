@@ -28,6 +28,7 @@ class EsiaAccessServiceImpl implements EsiaAccessService {
     private final DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm:ss Z")
             .withZone(ZoneId.systemDefault());
 
+    private final RestTemplate restTemplate;
     private final CryptoSigner cryptoSigner;
     private final EsiaProperties esiaProperties;
 
@@ -36,9 +37,11 @@ class EsiaAccessServiceImpl implements EsiaAccessService {
     private final UriComponentsBuilder baseAuthCodeUriBuilder;
     private final MultiValueMap<String, String> baseAccessTokenRequestBody;
 
-    EsiaAccessServiceImpl(CryptoSigner cryptoSigner, EsiaProperties esiaProperties) {
+    EsiaAccessServiceImpl(RestTemplate restTemplate, CryptoSigner cryptoSigner, EsiaProperties esiaProperties) {
+        this.restTemplate = restTemplate;
         this.cryptoSigner = cryptoSigner;
         this.esiaProperties = esiaProperties;
+
 
         Scope[] scopes = {Scope.FULLNAME, Scope.GENDER, Scope.BIRTHDATE
                 , Scope.BIRTHPLACE, Scope.BIRTH_CERT_DOC, Scope.CONTACTS, Scope.INN, Scope.SNILS, Scope.RESIDENCE_DOC
@@ -127,9 +130,8 @@ class EsiaAccessServiceImpl implements EsiaAccessService {
             postBody.add("state", state);
             postBody.add("timestamp", timestamp);
 
-            logger.debug("access token post body parameters: {}", postBody);
-            AccessTokenDto accessTokenDto = new RestTemplate().postForObject(esiaProperties.getAccessTokenUrl(), postBody, AccessTokenDto.class);
-//            String response = new RestTemplate().postForObject(esiaProperties.getAccessTokenUrl(), httpEntity, String.class);
+            logger.debug("fetching esia access token, post body parameters: {}", postBody);
+            AccessTokenDto accessTokenDto = restTemplate.postForObject(esiaProperties.getAccessTokenUrl(), postBody, AccessTokenDto.class);
 //            logger.debug("response: {}", response);
 
             logger.debug("accessTokenDto: {}", accessTokenDto);

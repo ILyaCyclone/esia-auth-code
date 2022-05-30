@@ -11,11 +11,12 @@ esia:
   #file path to ESIA public certificate for JWT verification
   certificate-path: ${ESIA_CERTIFICATE_PATH}
 
+  connect-timeout: 30s
+  read-timeout: 30s
+
 
   client-id: ${ESIA_CLIENT_ID}
   return-url: http://localhost:${server.port}/login/oauth2/code/esia
-  #  return-url: http://localhost:${server.port}/esia_return
-  #  return-url: http://10.242.101.40:${server.port}/esia_return
 
   keystore-alias: ${ESIA_KEYSTORE_ALIAS}
   keystore-password: ${ESIA_KEYSTORE_PASSWORD}
