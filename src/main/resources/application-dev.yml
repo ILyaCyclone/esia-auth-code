@@ -3,8 +3,10 @@ server.port: 8080
 esia:
   base-url: https://esia-portal1.test.gosuslugi.ru
   #  base-url: https://esia.gosuslugi.ru
-  auth-code-url: ${esia.base-url}/aas/oauth2/ac
-  access-token-url: ${esia.base-url}/aas/oauth2/te
+  auth-code-url-v1: ${esia.base-url}/aas/oauth2/ac
+  auth-code-url-v2: ${esia.base-url}/aas/oauth2/v2/ac
+  access-token-url-v1: ${esia.base-url}/aas/oauth2/te
+  access-token-url-v3: ${esia.base-url}/aas/oauth2/v3/te
   data-collections-url: ${esia.base-url}/rs/prns
 
   issuer: http://esia-portal1.test.gosuslugi.ru/
@@ -16,7 +18,8 @@ esia:
 
 
   client-id: ${ESIA_CLIENT_ID}
-  return-url: http://localhost:${server.port}/login/oauth2/code/esia
+  #  client-certificate-hash: AAABBBCCC
+  return-url: http://localhost:${server.port}/login/oauth2/code/esia_debug_authcode
 
   keystore-alias: ${ESIA_KEYSTORE_ALIAS}
   keystore-password: ${ESIA_KEYSTORE_PASSWORD}

@@ -10,8 +10,12 @@ import java.time.Duration;
 @ConstructorBinding
 @Data
 public class EsiaProperties {
-    private final String authCodeUrl;
-    private final String accessTokenUrl;
+    private final String authCodeUrlV1;
+    private final String authCodeUrlV2;
+
+    private final String accessTokenUrlV1;
+    private final String accessTokenUrlV3;
+
     private final String dataCollectionsUrl;
 
     private final String issuer;
@@ -21,6 +25,7 @@ public class EsiaProperties {
     private final Duration readTimeout;
 
     private final String clientId;
+    private final String clientCertificateHash;
     private final String returnUrl;
 
     private final String keystoreAlias;

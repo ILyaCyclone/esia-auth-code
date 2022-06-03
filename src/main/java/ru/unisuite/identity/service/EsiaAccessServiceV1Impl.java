@@ -2,7 +2,6 @@ package ru.unisuite.identity.service;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
@@ -18,12 +17,14 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.UUID;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
-@Service
-class EsiaAccessServiceImpl implements EsiaAccessService {
-    private static final Logger logger = LoggerFactory.getLogger(EsiaAccessServiceImpl.class);
+/**
+ * /ac endpointed is deprecated
+ */
+//@Service
+@Deprecated
+public class EsiaAccessServiceV1Impl implements EsiaAccessService {
+    private static final Logger logger = LoggerFactory.getLogger(EsiaAccessServiceV1Impl.class);
 
     private final DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm:ss Z")
             .withZone(ZoneId.systemDefault());
@@ -37,22 +38,23 @@ class EsiaAccessServiceImpl implements EsiaAccessService {
     private final UriComponentsBuilder baseAuthCodeUriBuilder;
     private final MultiValueMap<String, String> baseAccessTokenRequestBody;
 
-    EsiaAccessServiceImpl(RestTemplate restTemplate, CryptoSigner cryptoSigner, EsiaProperties esiaProperties) {
+    EsiaAccessServiceV1Impl(RestTemplate restTemplate, CryptoSigner cryptoSigner, EsiaProperties esiaProperties) {
         this.restTemplate = restTemplate;
         this.cryptoSigner = cryptoSigner;
         this.esiaProperties = esiaProperties;
 
 
-        Scope[] scopes = {Scope.FULLNAME, Scope.GENDER, Scope.BIRTHDATE
-                , Scope.BIRTHPLACE, Scope.BIRTH_CERT_DOC, Scope.CONTACTS, Scope.INN, Scope.SNILS, Scope.RESIDENCE_DOC
-                , Scope.TEMPORARY_RESIDENCE_DOC
-                , Scope.ID_DOC, Scope.TEMPORARY_RESIDENCE_DOC
-        };
-        scope = Stream.of(scopes).map(streamScope -> streamScope.toString().toLowerCase()).collect(Collectors.joining(" "));
+//        Scope[] scopes = {Scope.FULLNAME, Scope.GENDER, Scope.BIRTHDATE
+//                , Scope.BIRTHPLACE, Scope.BIRTH_CERT_DOC, Scope.CONTACTS, Scope.INN, Scope.SNILS, Scope.RESIDENCE_DOC
+//                , Scope.TEMPORARY_RESIDENCE_DOC
+//                , Scope.ID_DOC, Scope.TEMPORARY_RESIDENCE_DOC
+//        };
+//        scope = Stream.of(scopes).map(streamScope -> streamScope.toString().toLowerCase()).collect(Collectors.joining(" "));
+        scope = "fullname";
 
 
-        baseAuthCodeUriBuilder = UriComponentsBuilder.fromHttpUrl(esiaProperties.getAuthCodeUrl())
-                .queryParam("client_id", esiaProperties.getClientId())
+        baseAuthCodeUriBuilder = UriComponentsBuilder.fromHttpUrl(esiaProperties.getAuthCodeUrlV1())
+                .queryParam("client_id", esiaProperties.getClientId().toUpperCase())
                 .queryParam("scope", scope)
                 .queryParam("response_type", "code")
                 .queryParam("access_type", "offline"); // "offline" or "online"
@@ -131,7 +133,7 @@ class EsiaAccessServiceImpl implements EsiaAccessService {
             postBody.add("timestamp", timestamp);
 
             logger.debug("fetching esia access token, post body parameters: {}", postBody);
-            AccessTokenDto accessTokenDto = restTemplate.postForObject(esiaProperties.getAccessTokenUrl(), postBody, AccessTokenDto.class);
+            AccessTokenDto accessTokenDto = restTemplate.postForObject(esiaProperties.getAccessTokenUrlV1(), postBody, AccessTokenDto.class);
 //            logger.debug("response: {}", response);
 
             logger.debug("accessTokenDto: {}", accessTokenDto);
