@@ -1,1 +1,1 @@
-spring.config.import: ${esia.config.location:/u01/scr/esia/tesia.yml}
+spring.config.import: /u01/scr/esia/tesia_debug.yml

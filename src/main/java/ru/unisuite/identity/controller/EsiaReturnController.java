@@ -4,12 +4,14 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Controller;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.util.UriComponentsBuilder;
 import ru.unisuite.identity.EsiaProperties;
 import ru.unisuite.identity.service.CabinetAuthorizationDto;
 import ru.unisuite.identity.service.CabinetProfileService;
+import ru.unisuite.identity.service.EsiaAccessException;
 
 @Controller
 @RequiredArgsConstructor
@@ -25,7 +27,12 @@ public class EsiaReturnController {
             , @RequestParam(name = "error", required = false) String error
             , @RequestParam(name = "error_description", required = false) String errorDescription
     ) {
-        CabinetAuthorizationDto cabinetAuthorizationCodeDto = cabinetProfileService.getCabinetAuthorizationCode(authorizationCode, error, errorDescription);
+        if (!StringUtils.hasText(authorizationCode)) {
+            throw new EsiaAccessException("Authorization code not received. Error: '" + error
+                    + "'. Description: '" + errorDescription + "'.");
+        }
+
+        CabinetAuthorizationDto cabinetAuthorizationCodeDto = cabinetProfileService.getCabinetAuthorizationCode(authorizationCode);
 
         String cabinetUrl = UriComponentsBuilder.fromHttpUrl(esiaProperties.getCabinetRedirectUrl())
                 .queryParam("token", cabinetAuthorizationCodeDto.getAuthorizationCode())

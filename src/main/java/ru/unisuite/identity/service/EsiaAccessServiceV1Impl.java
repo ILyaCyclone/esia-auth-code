@@ -2,6 +2,7 @@ package ru.unisuite.identity.service;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
@@ -17,11 +18,13 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
- * /ac endpointed is deprecated
+ * @deprecated /ac endpointed is deprecated
  */
-//@Service
+@Service
 @Deprecated
 public class EsiaAccessServiceV1Impl implements EsiaAccessService {
     private static final Logger logger = LoggerFactory.getLogger(EsiaAccessServiceV1Impl.class);
@@ -44,13 +47,8 @@ public class EsiaAccessServiceV1Impl implements EsiaAccessService {
         this.esiaProperties = esiaProperties;
 
 
-//        Scope[] scopes = {Scope.FULLNAME, Scope.GENDER, Scope.BIRTHDATE
-//                , Scope.BIRTHPLACE, Scope.BIRTH_CERT_DOC, Scope.CONTACTS, Scope.INN, Scope.SNILS, Scope.RESIDENCE_DOC
-//                , Scope.TEMPORARY_RESIDENCE_DOC
-//                , Scope.ID_DOC, Scope.TEMPORARY_RESIDENCE_DOC
-//        };
-//        scope = Stream.of(scopes).map(streamScope -> streamScope.toString().toLowerCase()).collect(Collectors.joining(" "));
-        scope = "fullname";
+        Scope[] scopes = {Scope.FULLNAME, Scope.BIRTHDATE, Scope.GENDER, Scope.SNILS, Scope.ID_DOC, Scope.EMAIL, Scope.MOBILE};
+        this.scope = Stream.of(scopes).map(streamScope -> streamScope.toString().toLowerCase()).collect(Collectors.joining(" "));
 
 
         baseAuthCodeUriBuilder = UriComponentsBuilder.fromHttpUrl(esiaProperties.getAuthCodeUrlV1())
@@ -166,7 +164,7 @@ public class EsiaAccessServiceV1Impl implements EsiaAccessService {
         String clientSecretUnsigned = String.join("", scope, timestamp, clientId, state);
         logger.debug("clientSecretUnsigned: {}", clientSecretUnsigned);
 
-        byte[] signedClientSecretBytes = cryptoSigner.signPkcs7Detached(clientSecretUnsigned);
+        byte[] signedClientSecretBytes = cryptoSigner.signGost2012Pkcs7Detached(clientSecretUnsigned);
         return Base64.getUrlEncoder().encodeToString(signedClientSecretBytes);
     }
 

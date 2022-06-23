@@ -14,6 +14,7 @@ import ru.unisuite.identity.EsiaProperties;
 
 import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
+import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.Signature;
 import java.security.cert.Certificate;
@@ -61,32 +62,45 @@ class CryptoSignerImpl implements CryptoSigner {
         }
     }
 
+
     @Override
-    public byte[] signPkcs7Detached(String textToSign) {
-        boolean detached = true;
+    public byte[] signGost2012(String textToSign) {
         try {
-            return cmsSign(textToSign.getBytes(StandardCharsets.UTF_8.name()), privateKey, certificate, detached);
+            byte[] bytesToSign = textToSign.getBytes(StandardCharsets.UTF_8.name());
+            Signature signature = getSignature();
+            return sign(bytesToSign, privateKey, signature);
         } catch (Exception e) {
-            throw new CryptoSignerException("Unable to sign '"
+            throw new CryptoSignerException("Unable to sign (Gost2012)'"
                     + (textToSign.length() <= 200 ? textToSign : textToSign.substring(0, 188) + "…(truncated)")
                     + '\'', e);
         }
     }
 
-
-    /**
-     * Cryptographic Message Syntax (CMS)
-     * https://tools.ietf.org/html/rfc5652
-     */
-    private byte[] cmsSign(byte[] data, PrivateKey key, Certificate cert, boolean detached) throws Exception {
-        Signature signature = Signature.getInstance(JCP.GOST_SIGN_2012_256_NAME);
-
-        signature.initSign(key);
-        signature.update(data);
-        byte[] sign = signature.sign();
-        return createCMS(data, sign, cert, detached);
+    @Override
+    public byte[] signGost2012Pkcs7Detached(String textToSign) {
+        final boolean detached = true;
+        try {
+            byte[] bytesToSign = textToSign.getBytes(StandardCharsets.UTF_8.name());
+            Signature signature = getSignature();
+            byte[] signedBytes = sign(bytesToSign, privateKey, signature);
+            return createCMS(bytesToSign, signedBytes, certificate, detached);
+        } catch (Exception e) {
+            throw new CryptoSignerException("Unable to sign (Gost2012Pkcs7Detached)'"
+                    + (textToSign.length() <= 200 ? textToSign : textToSign.substring(0, 188) + "…(truncated)")
+                    + '\'', e);
+        }
     }
 
+    private byte[] sign(byte[] data, PrivateKey key, Signature signature) throws Exception {
+        signature.initSign(key);
+        signature.update(data);
+        return signature.sign();
+    }
+
+    /**
+     * CMS - Cryptographic Message Syntax
+     * https://tools.ietf.org/html/rfc5652
+     */
     private byte[] createCMS(byte[] buffer, byte[] sign, Certificate cert, boolean detached) throws Exception {
         ContentInfo all = new ContentInfo();
         all.contentType = new Asn1ObjectIdentifier((new OID("1.2.840.113549.1.7.2")).value);
@@ -131,5 +145,9 @@ class CryptoSignerImpl implements CryptoSigner {
         Asn1BerEncodeBuffer asnBuf = new Asn1BerEncodeBuffer();
         all.encode(asnBuf, true);
         return asnBuf.getMsgCopy();
+    }
+
+    private Signature getSignature() throws NoSuchAlgorithmException {
+        return Signature.getInstance(JCP.GOST_SIGN_2012_256_NAME);
     }
 }

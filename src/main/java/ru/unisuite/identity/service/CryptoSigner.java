@@ -1,5 +1,7 @@
 package ru.unisuite.identity.service;
 
 public interface CryptoSigner {
-    byte[] signPkcs7Detached(String textToSign);
+    byte[] signGost2012(String textToSign);
+
+    byte[] signGost2012Pkcs7Detached(String textToSign);
 }

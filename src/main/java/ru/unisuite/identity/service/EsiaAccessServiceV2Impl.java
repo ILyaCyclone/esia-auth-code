@@ -3,9 +3,11 @@ package ru.unisuite.identity.service;
 import lombok.Builder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 import ru.unisuite.identity.EsiaProperties;
@@ -19,8 +21,11 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
+@Primary
 public class EsiaAccessServiceV2Impl implements EsiaAccessService {
     private static final Logger logger = LoggerFactory.getLogger(EsiaAccessServiceV2Impl.class);
 
@@ -30,6 +35,7 @@ public class EsiaAccessServiceV2Impl implements EsiaAccessService {
     private final RestTemplate restTemplate;
     private final CryptoSigner cryptoSigner;
     private final EsiaProperties esiaProperties;
+
 
 
     private final String scope;
@@ -42,14 +48,8 @@ public class EsiaAccessServiceV2Impl implements EsiaAccessService {
         this.esiaProperties = esiaProperties;
 
 
-//        Scope[] scopes = {Scope.FULLNAME, Scope.GENDER, Scope.BIRTHDATE
-//                , Scope.BIRTHPLACE, Scope.BIRTH_CERT_DOC, Scope.CONTACTS, Scope.INN, Scope.SNILS, Scope.RESIDENCE_DOC
-//                , Scope.ID_DOC, Scope.TEMPORARY_RESIDENCE_DOC
-//        };
-//        Scope[] scopes = {Scope.FULLNAME, Scope.BIRTHDATE, Scope.GENDER, Scope.SNILS, Scope.ID_DOC, Scope.EMAIL, Scope.MOBILE};
-//        scope = Stream.of(scopes).map(streamScope -> streamScope.toString().toLowerCase()).collect(Collectors.joining(" "));
-        scope = "fullname";
-
+        Scope[] scopes = {Scope.FULLNAME, Scope.BIRTHDATE, Scope.GENDER, Scope.SNILS, Scope.ID_DOC, Scope.EMAIL, Scope.MOBILE};
+        this.scope = Stream.of(scopes).map(streamScope -> streamScope.toString().toLowerCase()).collect(Collectors.joining(" "));
 
         baseAuthCodeUriBuilder = UriComponentsBuilder.fromHttpUrl(esiaProperties.getAuthCodeUrlV2())
                 .queryParam("client_id", esiaProperties.getClientId())
@@ -61,10 +61,11 @@ public class EsiaAccessServiceV2Impl implements EsiaAccessService {
 
         baseAccessTokenRequestBody = new LinkedMultiValueMap<>();
         baseAccessTokenRequestBody.add("client_id", esiaProperties.getClientId());
-        baseAccessTokenRequestBody.add("grant_type", "authorization_code");
         baseAccessTokenRequestBody.add("scope", scope);
-        baseAccessTokenRequestBody.add("token_type", "Bearer");
         baseAccessTokenRequestBody.add("redirect_uri", urlEncode(esiaProperties.getReturnUrl()));
+        baseAccessTokenRequestBody.add("client_certificate_hash", esiaProperties.getClientCertificateHash());
+        baseAccessTokenRequestBody.add("grant_type", "authorization_code");
+        baseAccessTokenRequestBody.add("token_type", "Bearer");
     }
 
 
@@ -78,13 +79,6 @@ public class EsiaAccessServiceV2Impl implements EsiaAccessService {
             String clientSecret = generateAuthorizationCodeClientSecret(ClientSecretParameters.builder()
                     .clientId(clientId).scope(scope).timestamp(timestamp).state(state).redirectUrl(returnUrl)
                     .build());
-
-//            byte[] bytes = clientSecret.getBytes(StandardCharsets.UTF_8);
-//            byte[] mirrorBytes = new byte[bytes.length];
-//            for (int i = 0; i < bytes.length; i++) {
-//                mirrorBytes[i] = bytes[bytes.length - 1 - i];
-//            }
-//            clientSecret = new String(mirrorBytes);
 
             UriComponentsBuilder authCodeUriBuilder = baseAuthCodeUriBuilder.cloneBuilder()
                     .queryParam("client_secret", clientSecret)
@@ -104,28 +98,43 @@ public class EsiaAccessServiceV2Impl implements EsiaAccessService {
 
 
     /**
-     *  <client_id> – идентификатор системы-клиента (мнемоника системы в ЕСИА указанная прописными буквами);
-     *  <code> – значение авторизационного кода, который был ранее получен от ЕСИА и который необходимо обменять на
-     * маркер доступа;
-     *  <grant_type> – принимает значение “authorization_code”, если авторизационный код обменивается на маркер
-     * доступа;
-     *  <client_secret> – подпись запроса в формате PKCS#7 detached signature в кодировке UTF8 от значений четырех
-     * параметров HTTP–запроса: scope, timestamp, clientId, state (без разделителей). <client_secret> должен быть
-     * закодирован в формате base64 url safe. Используемый для проверки подписи сертификат должен быть предварительно
-     * зарегистрирован в ЕСИА и привязан к учетной записи системы-клиента в ЕСИА. ЕСИА поддерживает сертификаты в
-     * формате X.509. ЕСИА поддерживает алгоритм формирования электронной подписи ГОСТ Р 34.10-2012 и алгоритм
-     * криптографического хэширования ГОСТ Р 34.11-2012.
-     *  <state> – набор случайных символов, имеющий вид 128-битного идентификатора запроса (необходимо для защиты от
-     * перехвата), генерируется по стандарту UUID; этот набор символов должен отличаться от того, который
-     * использовался при получении авторизационного кода;
-     *  <redirect_uri> – ссылка, по которой должен быть направлен пользователь после того, как даст разрешение на
-     * доступ (то же самое значение, которое было указано в запросе на получение авторизационного кода);
-     *  <scope> – область доступа, т.е. запрашиваемые права (то же самое значение, которое было указано в запросе на
-     * получение авторизационного кода);
-     *  <timestamp> – время запроса маркера в формате yyyy.MM.dd HH:mm:ss Z (например, 2013.01.25 14:36:11 +0400),
-     * необходимое для фиксации начала временного промежутка, в течение которого будет валиден запрос с данным
-     * идентификатором (<state>);
-     *  <token_type> – тип запрашиваемого маркера, в настоящее время ЕСИА поддерживает только значение “Bearer
+     *  <client_secret> - подпись значений шести параметров в кодировке UTF-8:
+     *  client_id;
+     *  scope;
+     *  timestamp;
+     *  state;
+     *  redirect_uri;
+     *  code.
+     * Порядок формирования <client_secret>:
+     * 1. конкатенировать вышеуказанные параметры (порядок важен!).
+     * 2. подписать полученную строку с использованием алгоритма подписания data hash с
+     * использованием механизмов КриптоПРО CSP и сертификата информационной
+     * системы;
+     * 3. закодировать полученное значение в URL Safe Base64.
+     *  <client_id> – идентификатор системы-клиента (мнемоника системы в ЕСИА указанная
+     * прописными буквами);
+     *  <scope> – область доступа, т.е. запрашиваемые права (то же самое значение, которое было
+     * указано в запросе на получение авторизационного кода);
+     *  <timestamp> – время запроса маркера в формате yyyy.MM.dd HH:mm:ss Z (например,
+     * 2013.01.25 14:36:11 +0400), необходимое для фиксации начала временного промежутка,
+     * в течение которого будет валиден запрос с данным идентификатором (<state>);
+     *  <state> – набор случайных символов, имеющий вид 128-битного идентификатора запроса
+     * (необходимо для защиты от перехвата), генерируется по стандарту UUID; этот набор
+     * символов должен отличаться от того, который использовался при получении
+     * авторизационного кода;
+     *  <redirect_uri> – ссылка, по которой должен быть направлен пользователь после того, как
+     * даст разрешение на доступ (то же самое значение, которое было указано в запросе
+     * на получение авторизационного кода). Значение <redirect_uri> должно быть
+     * предварительно указано в параметрах внешней ИС в ЕСИА - на стороне ЕСИА
+     * выполняется верификация соответствия redirect_uri в запросе и в настройках системы;
+     *  <client_certificate_hash> - параметр, содержащий хэш сертификата. Для вычисления значения
+     * используется специализированная утилита;
+     *  <code> – значение авторизационного кода, который был ранее получен от ЕСИА
+     * и который необходимо обменять на маркер доступа;
+     *  <grant_type> – принимает значение «authorization_code», если авторизационный код
+     * обменивается на маркер доступа;
+     *  <token_type> – тип запрашиваемого маркера, в настоящее время ЕСИА поддерживает
+     * только значение «Bearer».
      */
     @Override
     public AccessTokenDto getAccessToken(String authenticationCode) {
@@ -134,24 +143,26 @@ public class EsiaAccessServiceV2Impl implements EsiaAccessService {
             String state = generateState();
             String timestamp = generateTimestamp();
             String returnUrl = esiaProperties.getReturnUrl();
+
             String clientSecret = generateAccessTokenClientSecret(
                     ClientSecretParameters.builder().clientId(clientId).scope(scope).timestamp(timestamp).state(state).redirectUrl(returnUrl)
                             .authorizationCode(authenticationCode)
                             .build());
 
             MultiValueMap<String, String> postBody = new LinkedMultiValueMap<>(baseAccessTokenRequestBody);
-            postBody.add("code", authenticationCode);
             postBody.add("client_secret", clientSecret);
-            postBody.add("state", state);
             postBody.add("timestamp", timestamp);
+            postBody.add("state", state);
+            postBody.add("code", authenticationCode);
 
             logger.debug("fetching esia access token, post body parameters: {}", postBody);
             AccessTokenDto accessTokenDto = restTemplate.postForObject(esiaProperties.getAccessTokenUrlV3(), postBody, AccessTokenDto.class);
-//            logger.debug("response: {}", response);
 
             logger.debug("accessTokenDto: {}", accessTokenDto);
 
             return accessTokenDto;
+        } catch (HttpClientErrorException e) {
+            throw new EsiaAccessException("Unable to get access token with API response status " + e.getRawStatusCode() + " and body: " + e.getResponseBodyAsString(), e);
         } catch (Exception e) {
             throw new EsiaAccessException("Unable to get access token for authorization code '" + authenticationCode + '\'', e);
         }
@@ -180,7 +191,7 @@ public class EsiaAccessServiceV2Impl implements EsiaAccessService {
         String clientSecretUnsigned = String.join("", toJoin);
         logger.debug("generateAuthorizationCodeClientSecret clientSecretUnsigned: {}", clientSecretUnsigned);
 
-        byte[] signedClientSecretBytes = cryptoSigner.signPkcs7Detached(clientSecretUnsigned);
+        byte[] signedClientSecretBytes = cryptoSigner.signGost2012(clientSecretUnsigned);
         return Base64.getUrlEncoder().encodeToString(signedClientSecretBytes);
     }
 
@@ -189,7 +200,7 @@ public class EsiaAccessServiceV2Impl implements EsiaAccessService {
         String clientSecretUnsigned = String.join("", toJoin);
         logger.debug("generateAccessTokenClientSecret clientSecretUnsigned: {}", clientSecretUnsigned);
 
-        byte[] signedClientSecretBytes = cryptoSigner.signPkcs7Detached(clientSecretUnsigned);
+        byte[] signedClientSecretBytes = cryptoSigner.signGost2012(clientSecretUnsigned);
         return Base64.getUrlEncoder().encodeToString(signedClientSecretBytes);
     }
 

@@ -10,7 +10,6 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.core.namedparam.SqlParameterSource;
 import org.springframework.jdbc.core.simple.SimpleJdbcCall;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 import ru.unisuite.identity.EsiaProperties;
 import ru.unisuite.identity.dto.AccessTokenDto;
 
@@ -27,7 +26,7 @@ public class CabinetProfileServiceImpl implements CabinetProfileService {
     private static final String SERVICE_NAME = "cabinet";
     private static final String AUTH_PROVIDER = "esia";
 
-    private final EsiaAccessService esiaAccessService;
+    private final EsiaAccessServiceV1Impl esiaAccessService;
     private final PersonalDataService personalDataService;
     private final EsiaPublicKeyProvider esiaPublicKeyProvider;
     private final EsiaProperties esiaProperties;
@@ -61,7 +60,7 @@ public class CabinetProfileServiceImpl implements CabinetProfileService {
 
     private final Map<String, Object> createAuthCodeCommonParams;
 
-    public CabinetProfileServiceImpl(EsiaAccessService esiaAccessService, PersonalDataService personalDataService
+    public CabinetProfileServiceImpl(EsiaAccessServiceV1Impl esiaAccessService, PersonalDataService personalDataService
             , EsiaPublicKeyProvider esiaPublicKeyProvider, EsiaProperties esiaProperties, NamedParameterJdbcTemplate jdbcTemplate) {
 
         this.esiaAccessService = esiaAccessService;
@@ -103,12 +102,7 @@ public class CabinetProfileServiceImpl implements CabinetProfileService {
     }
 
     @Override
-    public CabinetAuthorizationDto getCabinetAuthorizationCode(String esiaAuthorizationCode, String error, String errorDescription) {
-        if (!StringUtils.hasText(esiaAuthorizationCode)) {
-            logger.warn("Didn't receive authorization code {error: '{}', errorDescription: '{}'}", error, errorDescription);
-            throw new RuntimeException("Не удалось получить код авторизации: " + error + " " + errorDescription);
-        }
-
+    public CabinetAuthorizationDto getCabinetAuthorizationCode(String esiaAuthorizationCode) {
         AccessTokenDto esiaAccessTokenDto = esiaAccessService.getAccessToken(esiaAuthorizationCode);
 
         Jwt<Header, Claims> accessTokenJwt = parseAndCheckAccessTokenJwt(esiaAccessTokenDto.getAccessToken());
