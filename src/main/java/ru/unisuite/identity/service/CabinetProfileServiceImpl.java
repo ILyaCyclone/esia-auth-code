@@ -12,6 +12,7 @@ import org.springframework.jdbc.core.simple.SimpleJdbcCall;
 import org.springframework.stereotype.Service;
 import ru.unisuite.identity.EsiaProperties;
 import ru.unisuite.identity.dto.AccessTokenDto;
+import ru.unisuite.identity.oauth2.Oauth2Flow;
 
 import javax.annotation.PostConstruct;
 import java.sql.Types;
@@ -26,7 +27,7 @@ public class CabinetProfileServiceImpl implements CabinetProfileService {
     private static final String SERVICE_NAME = "cabinet";
     private static final String AUTH_PROVIDER = "esia";
 
-    private final EsiaAccessServiceV1Impl esiaAccessService;
+    private final Oauth2Flow oauth2Flow;
     private final PersonalDataService personalDataService;
     private final EsiaPublicKeyProvider esiaPublicKeyProvider;
     private final EsiaProperties esiaProperties;
@@ -60,10 +61,10 @@ public class CabinetProfileServiceImpl implements CabinetProfileService {
 
     private final Map<String, Object> createAuthCodeCommonParams;
 
-    public CabinetProfileServiceImpl(EsiaAccessServiceV1Impl esiaAccessService, PersonalDataService personalDataService
+    public CabinetProfileServiceImpl(Oauth2Flow oauth2Flow, PersonalDataService personalDataService
             , EsiaPublicKeyProvider esiaPublicKeyProvider, EsiaProperties esiaProperties, NamedParameterJdbcTemplate jdbcTemplate) {
 
-        this.esiaAccessService = esiaAccessService;
+        this.oauth2Flow = oauth2Flow;
         this.personalDataService = personalDataService;
         this.esiaPublicKeyProvider = esiaPublicKeyProvider;
         this.esiaProperties = esiaProperties;
@@ -103,7 +104,7 @@ public class CabinetProfileServiceImpl implements CabinetProfileService {
 
     @Override
     public CabinetAuthorizationDto getCabinetAuthorizationCode(String esiaAuthorizationCode) {
-        AccessTokenDto esiaAccessTokenDto = esiaAccessService.getAccessToken(esiaAuthorizationCode);
+        AccessTokenDto esiaAccessTokenDto = oauth2Flow.getAccessToken(esiaAuthorizationCode);
 
         Jwt<Header, Claims> accessTokenJwt = parseAndCheckAccessTokenJwt(esiaAccessTokenDto.getAccessToken());
 

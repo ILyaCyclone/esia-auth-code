@@ -1,4 +1,4 @@
-package ru.unisuite.identity.service;
+package ru.unisuite.identity.oauth2;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -6,9 +6,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.util.UriComponentsBuilder;
 import ru.unisuite.identity.EsiaProperties;
 import ru.unisuite.identity.dto.AccessTokenDto;
+import ru.unisuite.identity.service.EsiaAccessException;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
@@ -18,16 +18,14 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.UUID;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
- * @deprecated /ac endpointed is deprecated
+ * @deprecated "/aas/oauth2/te" endpointed is deprecated. See {@link AccessTokenProviderImplV3}
  */
 @Service
 @Deprecated
-public class EsiaAccessServiceV1Impl implements EsiaAccessService {
-    private static final Logger logger = LoggerFactory.getLogger(EsiaAccessServiceV1Impl.class);
+public class AccessTokenProviderImplV1 implements AccessTokenProvider {
+    private static final Logger logger = LoggerFactory.getLogger(AccessTokenProviderImplV1.class);
 
     private final DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm:ss Z")
             .withZone(ZoneId.systemDefault());
@@ -36,27 +34,20 @@ public class EsiaAccessServiceV1Impl implements EsiaAccessService {
     private final CryptoSigner cryptoSigner;
     private final EsiaProperties esiaProperties;
 
+    private final String endpointUrl;
+
 
     private final String scope;
-    private final UriComponentsBuilder baseAuthCodeUriBuilder;
     private final MultiValueMap<String, String> baseAccessTokenRequestBody;
 
-    EsiaAccessServiceV1Impl(RestTemplate restTemplate, CryptoSigner cryptoSigner, EsiaProperties esiaProperties) {
+    AccessTokenProviderImplV1(RestTemplate restTemplate, CryptoSigner cryptoSigner, EsiaProperties esiaProperties) {
         this.restTemplate = restTemplate;
         this.cryptoSigner = cryptoSigner;
         this.esiaProperties = esiaProperties;
 
+        this.endpointUrl = esiaProperties.getBaseUrl() + "/aas/oauth2/te";
 
-        Scope[] scopes = {Scope.FULLNAME, Scope.BIRTHDATE, Scope.GENDER, Scope.SNILS, Scope.ID_DOC, Scope.EMAIL, Scope.MOBILE};
-        this.scope = Stream.of(scopes).map(streamScope -> streamScope.toString().toLowerCase()).collect(Collectors.joining(" "));
-
-
-        baseAuthCodeUriBuilder = UriComponentsBuilder.fromHttpUrl(esiaProperties.getAuthCodeUrlV1())
-                .queryParam("client_id", esiaProperties.getClientId().toUpperCase())
-                .queryParam("scope", scope)
-                .queryParam("response_type", "code")
-                .queryParam("access_type", "offline"); // "offline" or "online"
-
+        this.scope = esiaProperties.getScopesString();
 
         baseAccessTokenRequestBody = new LinkedMultiValueMap<>();
         baseAccessTokenRequestBody.add("client_id", esiaProperties.getClientId());
@@ -64,31 +55,6 @@ public class EsiaAccessServiceV1Impl implements EsiaAccessService {
         baseAccessTokenRequestBody.add("scope", scope);
         baseAccessTokenRequestBody.add("token_type", "Bearer");
         baseAccessTokenRequestBody.add("redirect_uri", urlEncode(esiaProperties.getReturnUrl()));
-    }
-
-
-    @Override
-    public String generateAuthCodeUrl() {
-        try {
-            String timestamp = generateTimestamp();
-            String clientId = esiaProperties.getClientId();
-            String state = generateState();
-            String clientSecret = generateClientSecret(scope, timestamp, clientId, state);
-
-            UriComponentsBuilder authCodeUriBuilder = baseAuthCodeUriBuilder.cloneBuilder()
-                    .queryParam("client_secret", clientSecret)
-                    .queryParam("state", state);
-
-            String url = authCodeUriBuilder.toUriString();
-            url += "&timestamp=" + urlEncode(timestamp);
-            url += "&redirect_uri=" + urlEncode(esiaProperties.getReturnUrl());
-
-            logger.debug("authentication code url: {}", url);
-
-            return url;
-        } catch (Exception e) {
-            throw new EsiaAccessException("Unable to generate access token url", e);
-        }
     }
 
 
@@ -117,7 +83,7 @@ public class EsiaAccessServiceV1Impl implements EsiaAccessService {
      *  <token_type> – тип запрашиваемого маркера, в настоящее время ЕСИА поддерживает только значение “Bearer
      */
     @Override
-    public AccessTokenDto getAccessToken(String authenticationCode) {
+    public AccessTokenDto getAccessToken(String authorizationCode) {
         try {
             String clientId = esiaProperties.getClientId();
             String state = generateState();
@@ -125,20 +91,19 @@ public class EsiaAccessServiceV1Impl implements EsiaAccessService {
             String clientSecret = generateClientSecret(scope, timestamp, clientId, state);
 
             MultiValueMap<String, String> postBody = new LinkedMultiValueMap<>(baseAccessTokenRequestBody);
-            postBody.add("code", authenticationCode);
+            postBody.add("code", authorizationCode);
             postBody.add("client_secret", clientSecret);
             postBody.add("state", state);
             postBody.add("timestamp", timestamp);
 
             logger.debug("fetching esia access token, post body parameters: {}", postBody);
-            AccessTokenDto accessTokenDto = restTemplate.postForObject(esiaProperties.getAccessTokenUrlV1(), postBody, AccessTokenDto.class);
-//            logger.debug("response: {}", response);
+            AccessTokenDto accessTokenDto = restTemplate.postForObject(endpointUrl, postBody, AccessTokenDto.class);
 
             logger.debug("accessTokenDto: {}", accessTokenDto);
 
             return accessTokenDto;
         } catch (Exception e) {
-            throw new EsiaAccessException("Unable to get access token for authorization code '" + authenticationCode + '\'', e);
+            throw new EsiaAccessException("Unable to get access token for authorization code '" + authorizationCode + '\'', e);
         }
     }
 
@@ -162,7 +127,7 @@ public class EsiaAccessServiceV1Impl implements EsiaAccessService {
 
     private String generateClientSecret(String scope, String timestamp, String clientId, String state) {
         String clientSecretUnsigned = String.join("", scope, timestamp, clientId, state);
-        logger.debug("clientSecretUnsigned: {}", clientSecretUnsigned);
+        logger.debug("clientSecret unsigned: {}", clientSecretUnsigned);
 
         byte[] signedClientSecretBytes = cryptoSigner.signGost2012Pkcs7Detached(clientSecretUnsigned);
         return Base64.getUrlEncoder().encodeToString(signedClientSecretBytes);

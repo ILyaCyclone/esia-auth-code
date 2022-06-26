@@ -3,20 +3,37 @@ package ru.unisuite.identity;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.ConstructorBinding;
+import ru.unisuite.identity.oauth2.Scope;
 
 import java.time.Duration;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @ConfigurationProperties(prefix = "esia")
 @ConstructorBinding
 @Data
 public class EsiaProperties {
-    private final String authCodeUrlV1;
-    private final String authCodeUrlV2;
 
-    private final String accessTokenUrlV1;
-    private final String accessTokenUrlV3;
+    private final Environment environment;
 
-    private final String dataCollectionsUrl;
+    private final List<Scope> scopes;
+
+    /**
+     * scopes as string (lowercased, separated with space), for use as http parameter
+     */
+    public String getScopesString() {
+        return getScopes().stream()
+                .map(streamScope -> streamScope.toString().toLowerCase())
+                .collect(Collectors.joining(" "));
+    }
+
+    public String getBaseUrl() {
+        return environment.baseUrl;
+    }
+
+    public String getIssuer() {
+        return environment.issuer;
+    }
 
     private final String issuer;
     private final String certificatePath;
@@ -32,4 +49,17 @@ public class EsiaProperties {
     private final String keystorePassword;
 
     private final String cabinetRedirectUrl;
+
+    enum Environment {
+        PROD("https://esia.gosuslugi.ru", "http://esia.gosuslugi.ru/"),
+        TEST("https://esia-portal1.test.gosuslugi.ru", "http://esia-portal1.test.gosuslugi.ru/");
+
+        private final String baseUrl;
+        private final String issuer;
+
+        Environment(String baseUrl, String issuer) {
+            this.baseUrl = baseUrl;
+            this.issuer = issuer;
+        }
+    }
 }

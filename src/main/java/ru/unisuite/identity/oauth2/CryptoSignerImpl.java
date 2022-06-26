@@ -1,22 +1,22 @@
-package ru.unisuite.identity.service;
+package ru.unisuite.identity.oauth2;
 
 import com.objsys.asn1j.runtime.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import ru.CryptoPro.Crypto.CryptoProvider;
 import ru.CryptoPro.JCP.ASN.CryptographicMessageSyntax.*;
 import ru.CryptoPro.JCP.ASN.PKIX1Explicit88.CertificateSerialNumber;
 import ru.CryptoPro.JCP.ASN.PKIX1Explicit88.Name;
 import ru.CryptoPro.JCP.JCP;
 import ru.CryptoPro.JCP.params.AlgIdSpec;
 import ru.CryptoPro.JCP.params.OID;
+import ru.CryptoPro.reprov.RevCheck;
 import ru.unisuite.identity.EsiaProperties;
 
 import java.nio.charset.StandardCharsets;
-import java.security.KeyStore;
-import java.security.NoSuchAlgorithmException;
-import java.security.PrivateKey;
 import java.security.Signature;
+import java.security.*;
 import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
 
@@ -31,11 +31,22 @@ class CryptoSignerImpl implements CryptoSigner {
     private final Certificate certificate;
 
     // for java 10 and higher https://www.cryptopro.ru/forum2/default.aspx?g=posts&m=105418#post105418
-//    static {
-//        Security.addProvider(new JCP());
-//        Security.addProvider(new RevCheck());
-//        Security.addProvider(new CryptoProvider());
-//    }
+    static {
+        String javaVersionProperty = System.getProperty("java.version");
+        String[] versionElements = javaVersionProperty.split("\\.");
+        int javaVersion;
+        if (versionElements.length == 1) {
+            javaVersion = Integer.parseInt(versionElements[0]);
+        } else {
+            javaVersion = Integer.parseInt(versionElements[1]);
+        }
+
+        if (javaVersion >= 10) {
+            Security.addProvider(new JCP());
+            Security.addProvider(new RevCheck());
+            Security.addProvider(new CryptoProvider());
+        }
+    }
 
     public CryptoSignerImpl(EsiaProperties esiaProperties) {
         try {

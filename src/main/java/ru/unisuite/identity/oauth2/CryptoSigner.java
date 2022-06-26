@@ -1,4 +1,4 @@
-package ru.unisuite.identity.service;
+package ru.unisuite.identity.oauth2;
 
 public interface CryptoSigner {
     byte[] signGost2012(String textToSign);

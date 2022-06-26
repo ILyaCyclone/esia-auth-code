@@ -15,18 +15,17 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import ru.unisuite.identity.EsiaProperties;
 import ru.unisuite.identity.dto.*;
+import ru.unisuite.identity.oauth2.Oauth2Flow;
+import ru.unisuite.identity.oauth2.Scope;
 import ru.unisuite.identity.profile.Contacts;
 import ru.unisuite.identity.profile.ProfileJsonNode;
-import ru.unisuite.identity.service.EsiaAccessService;
 import ru.unisuite.identity.service.EsiaPublicKeyProvider;
 import ru.unisuite.identity.service.PersonDataCollectionType;
 import ru.unisuite.identity.service.PersonalDataServiceImpl;
 
 import javax.annotation.PostConstruct;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
-import java.util.Objects;
-import java.util.StringJoiner;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -35,10 +34,12 @@ import java.util.stream.Stream;
 public class EsiaDebugOutputReturnController {
     private static final Logger logger = LoggerFactory.getLogger(EsiaDebugOutputReturnController.class);
 
-    private final EsiaAccessService esiaAuthUrlService;
     private final EsiaPublicKeyProvider esiaPublicKeyProvider;
     private final EsiaProperties esiaProperties;
     private final PersonalDataServiceImpl personalDataService;
+
+    private final Oauth2Flow oauth2Flow;
+    private final Set<Scope> scopes;
 
     private JwtParser jwtParser;
 
@@ -85,7 +86,7 @@ public class EsiaDebugOutputReturnController {
 
 
         if (StringUtils.hasText(authorizationCode)) {
-            AccessTokenDto accessTokenDto = esiaAuthUrlService.getAccessToken(authorizationCode);
+            AccessTokenDto accessTokenDto = oauth2Flow.getAccessToken(authorizationCode);
             joiner.add("accessTokenDto=" + accessTokenDto);
             tryJoinJWT(joiner, accessTokenDto.getAccessToken());
 
@@ -107,9 +108,14 @@ public class EsiaDebugOutputReturnController {
             Contacts contacts = personalDataService.mapToContacts(contactDtos);
             joiner.add(contacts.toString());
 
-//            List<AddressDto> addrs = personalDataService.getCollection(oid, accessTokenDto, PersonDataCollectionType.ADDRESSES, AddressDto.class);
-            List<AddressDto> addrs = personalDataService.getCollectionEmbedded(oid, accessTokenDto, PersonDataCollectionType.ADDRESSES, AddressDto.class);
-            addrs.forEach(addressDto -> joiner.add(addressDto.toString()));
+            if (scopes.contains(Scope.ADDRESSES)) {
+//                List<AddressDto> addrs = personalDataService.getCollection(oid, accessTokenDto, PersonDataCollectionType.ADDRESSES, AddressDto.class);
+                List<AddressDto> addrs = personalDataService.getCollectionEmbedded(oid, accessTokenDto, PersonDataCollectionType.ADDRESSES, AddressDto.class);
+                addrs.forEach(addressDto -> joiner.add(addressDto.toString()));
+            } else {
+                logger.warn("Scopes do not contain '{}', so '{}' personal data collection won't be fetched",
+                        Scope.ADDRESSES, PersonDataCollectionType.ADDRESSES);
+            }
 
 //            List<DocumentDto> documentDtos = getCollection(oid, accessTokenDto, PersonDataCollectionType.DOCUMENTS, DocumentDto.class);
             List<DocumentDto> documentDtos = personalDataService.getCollectionEmbedded(oid, accessTokenDto, PersonDataCollectionType.DOCUMENTS, DocumentDto.class);
@@ -122,19 +128,26 @@ public class EsiaDebugOutputReturnController {
 
             JsonNode personalDataJsonNode = personalDataService.getPersonalDataAsJsonNode(oid, accessTokenDto);
             List<JsonNode> contactsJsonNode = personalDataService.getCollectionEmbeddedAsJsonNodes(oid, accessTokenDto, PersonDataCollectionType.CONTACTS);
-            List<JsonNode> addressesJsonNode = personalDataService.getCollectionEmbeddedAsJsonNodes(oid, accessTokenDto, PersonDataCollectionType.ADDRESSES);
             List<JsonNode> documentsJsonNode = personalDataService.getCollectionEmbeddedAsJsonNodes(oid, accessTokenDto, PersonDataCollectionType.DOCUMENTS);
+            List<JsonNode> addressesJsonNode;
+            if (scopes.contains(Scope.ADDRESSES)) {
+                addressesJsonNode = personalDataService.getCollectionEmbeddedAsJsonNodes(oid, accessTokenDto, PersonDataCollectionType.ADDRESSES);
+            } else {
+                addressesJsonNode = Collections.emptyList();
+                logger.warn("Scopes do not contain '{}', so '{}' personal data collection won't be fetched",
+                        Scope.ADDRESSES, PersonDataCollectionType.ADDRESSES);
+            }
 
             ProfileJsonNode jsonNodeProfile = new ProfileJsonNode(personalDataJsonNode, addressesJsonNode
                     , contactsJsonNode, documentsJsonNode);
 
 //            String jsonNodexml = xmlMapper.writeValueAsString(jsonNodeProfile);
-            String jsonNodexml = xmlMapper.writerWithDefaultPrettyPrinter().writeValueAsString(jsonNodeProfile);
+            String profileXml = xmlMapper.writerWithDefaultPrettyPrinter().writeValueAsString(jsonNodeProfile);
 
-            logger.debug("jsonNodexml: {}", jsonNodexml);
+            logger.debug("profileXml: {}", profileXml);
 
             joiner.add("xml:");
-            joiner.add(jsonNodexml);
+            joiner.add(profileXml);
         }
 
         return joiner.toString();

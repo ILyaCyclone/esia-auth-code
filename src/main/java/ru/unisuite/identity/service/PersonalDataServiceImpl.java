@@ -17,14 +17,12 @@ import ru.unisuite.identity.EsiaProperties;
 import ru.unisuite.identity.dto.AccessTokenDto;
 import ru.unisuite.identity.dto.ContactDto;
 import ru.unisuite.identity.dto.PersonalDataDto;
+import ru.unisuite.identity.oauth2.Scope;
 import ru.unisuite.identity.profile.Contacts;
 import ru.unisuite.identity.profile.ProfileJsonNode;
 
 import javax.annotation.PostConstruct;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Spliterator;
-import java.util.Spliterators;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -36,7 +34,7 @@ public class PersonalDataServiceImpl implements PersonalDataService {
 
     private final EsiaProperties esiaProperties;
 
-    private final ObjectMapper objectMapper;
+    private final ObjectMapper jsonMapper;
     private final XmlMapper xmlMapper;
     private final RestTemplate restTemplate;
 
@@ -45,7 +43,7 @@ public class PersonalDataServiceImpl implements PersonalDataService {
 
     @PostConstruct
     public void init() {
-        dataCollectionsUriTemplate = esiaProperties.getDataCollectionsUrl() + "/{oid}/{collectionType}";
+        dataCollectionsUriTemplate = esiaProperties.getBaseUrl() + "/rs/prns/{oid}/{collectionType}";
         dataCollectionsEmbeddedUriTemplate = dataCollectionsUriTemplate + "?embed=(elements)";
     }
 
@@ -75,20 +73,20 @@ public class PersonalDataServiceImpl implements PersonalDataService {
 
     @Override
     public PersonalDataDto getPersonalDataDto(long oid, AccessTokenDto accessTokenDto) throws JsonProcessingException {
-        String url = esiaProperties.getDataCollectionsUrl() + "/" + oid;
+        String url = esiaProperties.getBaseUrl() + "/rs/prns/" + oid;
         ResponseEntity<String> personalDataResponse = restTemplate.exchange(url, HttpMethod.GET
                 , authorizationRequestEntity(accessTokenDto), String.class);
-        PersonalDataDto personalData = objectMapper.readValue(personalDataResponse.getBody(), PersonalDataDto.class);
+        PersonalDataDto personalData = jsonMapper.readValue(personalDataResponse.getBody(), PersonalDataDto.class);
 
         return personalData;
     }
 
     @Override
     public JsonNode getPersonalDataAsJsonNode(long oid, AccessTokenDto accessTokenDto) throws JsonProcessingException {
-        String url = esiaProperties.getDataCollectionsUrl() + "/" + oid;
+        String url = esiaProperties.getBaseUrl() + "/rs/prns/" + oid;
         ResponseEntity<String> personalDataResponse = restTemplate.exchange(url, HttpMethod.GET
                 , authorizationRequestEntity(accessTokenDto), String.class);
-        return objectMapper.readTree(personalDataResponse.getBody());
+        return jsonMapper.readTree(personalDataResponse.getBody());
     }
 
 
@@ -101,7 +99,7 @@ public class PersonalDataServiceImpl implements PersonalDataService {
         String collectionResponseString = collectionResponseEntity.getBody(); //  {"stateFacts":["hasSize"],"size":1,"eTag":"93E882A620BEDE1884695515724C772A43278794","elements":["https://esia-portal1.test.gosuslugi.ru/rs/prns/1000299654/ctts/14434265"]}
         logger.debug("collectionResponseString: {}", collectionResponseString);
 
-        return iteratorToStream(objectMapper.readTree(collectionResponseString).get("elements").elements())
+        return iteratorToStream(jsonMapper.readTree(collectionResponseString).get("elements").elements())
                 .map(collectionElement -> {
                     String elementUrl = collectionElement.asText();
                     validateCollectionElementUrl(elementUrl);
@@ -125,7 +123,7 @@ public class PersonalDataServiceImpl implements PersonalDataService {
         String collectionResponseString = collectionResponseEntity.getBody();
         logger.debug("getCollectionEmbedded collectionResponseString: {}", collectionResponseString);
 
-        return iteratorToStream(objectMapper.readTree(collectionResponseString).get("elements").elements())
+        return iteratorToStream(jsonMapper.readTree(collectionResponseString).get("elements").elements())
                 .map(elementJsonNode -> mapCollectionElement(elementJsonNode, resultClass))
                 .collect(Collectors.toList());
     }
@@ -139,7 +137,7 @@ public class PersonalDataServiceImpl implements PersonalDataService {
         String collectionResponseString = collectionResponseEntity.getBody();
         logger.debug("getCollectionEmbedded collectionResponseString: {}", collectionResponseString);
 
-        return iteratorToStream(objectMapper.readTree(collectionResponseString).get("elements").elements())
+        return iteratorToStream(jsonMapper.readTree(collectionResponseString).get("elements").elements())
                 .collect(Collectors.toList());
     }
 
@@ -148,13 +146,19 @@ public class PersonalDataServiceImpl implements PersonalDataService {
         try {
             JsonNode personalDataJsonNode = getPersonalDataAsJsonNode(oid, accessTokenDto);
             List<JsonNode> contactsJsonNode = getCollectionEmbeddedAsJsonNodes(oid, accessTokenDto, PersonDataCollectionType.CONTACTS);
-            List<JsonNode> addressesJsonNode = getCollectionEmbeddedAsJsonNodes(oid, accessTokenDto, PersonDataCollectionType.ADDRESSES);
             List<JsonNode> documentsJsonNode = getCollectionEmbeddedAsJsonNodes(oid, accessTokenDto, PersonDataCollectionType.DOCUMENTS);
+            List<JsonNode> addressesJsonNode;
+            if (esiaProperties.getScopes().contains(Scope.ADDRESSES)) {
+                addressesJsonNode = getCollectionEmbeddedAsJsonNodes(oid, accessTokenDto, PersonDataCollectionType.ADDRESSES);
+            } else {
+                addressesJsonNode = Collections.emptyList();
+                logger.warn("Scopes do not contain '{}', so '{}' personal data collection won't be fetched",
+                        Scope.ADDRESSES, PersonDataCollectionType.ADDRESSES);
+            }
 
             ProfileJsonNode profileJsonNode = new ProfileJsonNode(personalDataJsonNode, addressesJsonNode
                     , contactsJsonNode, documentsJsonNode);
 
-//            String jsonNodexml = xmlMapper.writeValueAsString(jsonNodeProfile);
             String profileXml = xmlMapper.writerWithDefaultPrettyPrinter().writeValueAsString(profileJsonNode);
             return profileXml;
         } catch (RuntimeException e) {
@@ -167,6 +171,7 @@ public class PersonalDataServiceImpl implements PersonalDataService {
 
 
     private void validateCollectionElementUrl(String url) {
+        // http(s)://(xxx.)gosuslugi.ru(/xxx)
         if (!url.matches("https?:\\/\\/(.+?\\.)?gosuslugi\\.ru($|\\/.+)")) {
             throw new RuntimeException("Collection URL is not safe `" + url + '\'');
         }
@@ -174,7 +179,7 @@ public class PersonalDataServiceImpl implements PersonalDataService {
 
     private <T> T mapCollectionElement(String elementResponseString, Class<T> resultClass) {
         try {
-            return objectMapper.readValue(elementResponseString, resultClass);
+            return jsonMapper.readValue(elementResponseString, resultClass);
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }
@@ -182,7 +187,7 @@ public class PersonalDataServiceImpl implements PersonalDataService {
 
     private <T> T mapCollectionElement(JsonNode elementJsonNode, Class<T> resultClass) {
         try {
-            return objectMapper.treeToValue(elementJsonNode, resultClass);
+            return jsonMapper.treeToValue(elementJsonNode, resultClass);
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }
