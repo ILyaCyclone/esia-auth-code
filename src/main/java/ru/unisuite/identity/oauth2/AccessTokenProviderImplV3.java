@@ -53,7 +53,7 @@ public class AccessTokenProviderImplV3 implements AccessTokenProvider {
         baseAccessTokenRequestBody = new LinkedMultiValueMap<>();
         baseAccessTokenRequestBody.add("client_id", esiaProperties.getClientId());
         baseAccessTokenRequestBody.add("scope", scope);
-        baseAccessTokenRequestBody.add("redirect_uri", urlEncode(esiaProperties.getReturnUrl()));
+//        baseAccessTokenRequestBody.add("redirect_uri", urlEncode(esiaProperties.getReturnUrl()));
         baseAccessTokenRequestBody.add("client_certificate_hash", esiaProperties.getClientCertificateHash());
         baseAccessTokenRequestBody.add("grant_type", "authorization_code");
         baseAccessTokenRequestBody.add("token_type", "Bearer");
@@ -100,23 +100,29 @@ public class AccessTokenProviderImplV3 implements AccessTokenProvider {
      * только значение «Bearer».
      */
     @Override
-    public AccessTokenDto getAccessToken(String authenticationCode) {
+    public AccessTokenDto getAccessToken(String authorizationCode) {
+        return getAccessToken(authorizationCode, esiaProperties.getReturnUrl());
+    }
+
+    @Override
+    public AccessTokenDto getAccessToken(String authorizationCode, String returnUrl) {
         try {
             String clientId = esiaProperties.getClientId();
             String state = generateState();
             String timestamp = generateTimestamp();
-            String returnUrl = esiaProperties.getReturnUrl();
 
             String clientSecret = generateClientSecret(
                     ClientSecretParameters.builder().clientId(clientId).scope(scope).timestamp(timestamp).state(state).redirectUrl(returnUrl)
-                            .authorizationCode(authenticationCode)
+                            .authorizationCode(authorizationCode)
                             .build());
 
             MultiValueMap<String, String> postBody = new LinkedMultiValueMap<>(baseAccessTokenRequestBody);
             postBody.add("client_secret", clientSecret);
             postBody.add("timestamp", timestamp);
             postBody.add("state", state);
-            postBody.add("code", authenticationCode);
+            postBody.add("code", authorizationCode);
+            postBody.add("redirect_uri", urlEncode(returnUrl));
+
 
             logger.debug("fetching esia access token, post body parameters: {}", postBody);
             AccessTokenDto accessTokenDto = restTemplate.postForObject(endpointUrl, postBody, AccessTokenDto.class);
@@ -127,7 +133,7 @@ public class AccessTokenProviderImplV3 implements AccessTokenProvider {
         } catch (HttpClientErrorException e) {
             throw new EsiaAccessException("Unable to get access token with API response status " + e.getRawStatusCode() + " and body: " + e.getResponseBodyAsString(), e);
         } catch (Exception e) {
-            throw new EsiaAccessException("Unable to get access token for authorization code '" + authenticationCode + '\'', e);
+            throw new EsiaAccessException("Unable to get access token for authorization code '" + authorizationCode + '\'', e);
         }
     }
 

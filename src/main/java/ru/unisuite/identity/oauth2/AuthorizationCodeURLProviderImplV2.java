@@ -52,11 +52,15 @@ public class AuthorizationCodeURLProviderImplV2 implements AuthorizationCodeURLP
 
     @Override
     public String generateAuthorizationCodeURL() {
+        return generateAuthorizationCodeURL(esiaProperties.getReturnUrl());
+    }
+
+    @Override
+    public String generateAuthorizationCodeURL(String returnUrl) {
         try {
             String timestamp = generateTimestamp();
             String clientId = esiaProperties.getClientId();
             String state = generateState();
-            String returnUrl = esiaProperties.getReturnUrl();
             String clientSecret = generateClientSecret(ClientSecretParameters.builder()
                     .clientId(clientId).scope(scope).timestamp(timestamp).state(state).redirectUrl(returnUrl)
                     .build());

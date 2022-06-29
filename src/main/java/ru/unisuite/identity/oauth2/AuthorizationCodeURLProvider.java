@@ -4,4 +4,6 @@ public interface AuthorizationCodeURLProvider {
 
     String generateAuthorizationCodeURL();
 
+    String generateAuthorizationCodeURL(String returnUrl);
+
 }

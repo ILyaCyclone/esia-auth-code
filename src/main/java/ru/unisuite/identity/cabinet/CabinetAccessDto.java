@@ -1,4 +1,4 @@
-package ru.unisuite.identity.dto;
+package ru.unisuite.identity.cabinet;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;

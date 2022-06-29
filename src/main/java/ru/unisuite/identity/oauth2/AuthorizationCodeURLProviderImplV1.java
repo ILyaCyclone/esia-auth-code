@@ -50,9 +50,13 @@ public class AuthorizationCodeURLProviderImplV1 implements AuthorizationCodeURLP
                 .queryParam("access_type", "offline"); // "offline" or "online"
     }
 
-
     @Override
     public String generateAuthorizationCodeURL() {
+        return generateAuthorizationCodeURL(esiaProperties.getReturnUrl());
+    }
+
+    @Override
+    public String generateAuthorizationCodeURL(String returnUrl) {
         try {
             String timestamp = generateTimestamp();
             String clientId = esiaProperties.getClientId();
@@ -65,7 +69,7 @@ public class AuthorizationCodeURLProviderImplV1 implements AuthorizationCodeURLP
 
             String url = authCodeUriBuilder.toUriString();
             url += "&timestamp=" + urlEncode(timestamp);
-            url += "&redirect_uri=" + urlEncode(esiaProperties.getReturnUrl());
+            url += "&redirect_uri=" + urlEncode(returnUrl);
 
             logger.debug("authentication code url: {}", url);
 

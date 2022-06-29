@@ -1,4 +1,4 @@
-package ru.unisuite.identity.service;
+package ru.unisuite.identity.cabinet;
 
 public interface CabinetProfileService {
 

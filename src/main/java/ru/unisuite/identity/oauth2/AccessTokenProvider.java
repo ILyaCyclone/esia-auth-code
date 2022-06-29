@@ -6,4 +6,5 @@ public interface AccessTokenProvider {
 
     AccessTokenDto getAccessToken(String authorizationCode);
 
+    AccessTokenDto getAccessToken(String authorizationCode, String returnUrl);
 }

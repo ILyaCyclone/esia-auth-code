@@ -1,4 +1,4 @@
-package ru.unisuite.identity.service;
+package ru.unisuite.identity.cabinet;
 
 import io.jsonwebtoken.*;
 import lombok.Data;
@@ -13,6 +13,8 @@ import org.springframework.stereotype.Service;
 import ru.unisuite.identity.EsiaProperties;
 import ru.unisuite.identity.dto.AccessTokenDto;
 import ru.unisuite.identity.oauth2.Oauth2Flow;
+import ru.unisuite.identity.service.EsiaPublicKeyProvider;
+import ru.unisuite.identity.service.PersonalDataService;
 
 import javax.annotation.PostConstruct;
 import java.sql.Types;
@@ -189,6 +191,6 @@ public class CabinetProfileServiceImpl implements CabinetProfileService {
                 .addValue("oid", oid)
                 .addValue("auth_provider", AUTH_PROVIDER);
 
-        return jdbcTemplate.queryForObject(sql, params, Integer.class) == 1;
+        return Integer.valueOf(1).equals(jdbcTemplate.queryForObject(sql, params, Integer.class));
     }
 }

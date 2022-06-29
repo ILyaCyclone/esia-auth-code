@@ -54,7 +54,6 @@ public class AccessTokenProviderImplV1 implements AccessTokenProvider {
         baseAccessTokenRequestBody.add("grant_type", "authorization_code");
         baseAccessTokenRequestBody.add("scope", scope);
         baseAccessTokenRequestBody.add("token_type", "Bearer");
-        baseAccessTokenRequestBody.add("redirect_uri", urlEncode(esiaProperties.getReturnUrl()));
     }
 
 
@@ -82,8 +81,14 @@ public class AccessTokenProviderImplV1 implements AccessTokenProvider {
      * идентификатором (<state>);
      *  <token_type> – тип запрашиваемого маркера, в настоящее время ЕСИА поддерживает только значение “Bearer
      */
+
     @Override
     public AccessTokenDto getAccessToken(String authorizationCode) {
+        return getAccessToken(authorizationCode, esiaProperties.getReturnUrl());
+    }
+
+    @Override
+    public AccessTokenDto getAccessToken(String authorizationCode, String returnUrl) {
         try {
             String clientId = esiaProperties.getClientId();
             String state = generateState();
@@ -95,6 +100,8 @@ public class AccessTokenProviderImplV1 implements AccessTokenProvider {
             postBody.add("client_secret", clientSecret);
             postBody.add("state", state);
             postBody.add("timestamp", timestamp);
+            postBody.add("redirect_uri", urlEncode(returnUrl));
+
 
             logger.debug("fetching esia access token, post body parameters: {}", postBody);
             AccessTokenDto accessTokenDto = restTemplate.postForObject(endpointUrl, postBody, AccessTokenDto.class);

@@ -103,7 +103,7 @@
   </dependencies>
 
   <build>
-    <finalName>aa_esia</finalName>
+    <finalName>aa_esia-auth-code</finalName>
 
     <plugins>
       <plugin>

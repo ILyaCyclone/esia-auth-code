@@ -9,8 +9,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.util.UriComponentsBuilder;
 import ru.unisuite.identity.EsiaProperties;
-import ru.unisuite.identity.service.CabinetAuthorizationDto;
-import ru.unisuite.identity.service.CabinetProfileService;
+import ru.unisuite.identity.cabinet.CabinetAuthorizationDto;
+import ru.unisuite.identity.cabinet.CabinetProfileService;
 import ru.unisuite.identity.service.EsiaAccessException;
 
 @Controller
