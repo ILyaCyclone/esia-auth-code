@@ -1,5 +1,7 @@
 package ru.unisuite.identity.cabinet;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import io.jsonwebtoken.*;
 import lombok.Data;
 import org.slf4j.Logger;
@@ -11,8 +13,11 @@ import org.springframework.jdbc.core.namedparam.SqlParameterSource;
 import org.springframework.jdbc.core.simple.SimpleJdbcCall;
 import org.springframework.stereotype.Service;
 import ru.unisuite.identity.EsiaProperties;
+import ru.unisuite.identity.config.ClientProperties;
 import ru.unisuite.identity.dto.AccessTokenDto;
+import ru.unisuite.identity.dto.PersonalDataDto;
 import ru.unisuite.identity.oauth2.Oauth2Flow;
+import ru.unisuite.identity.profile.ProfileJsonNode;
 import ru.unisuite.identity.service.EsiaPublicKeyProvider;
 import ru.unisuite.identity.service.PersonalDataService;
 
@@ -26,13 +31,18 @@ import java.util.stream.Stream;
 public class CabinetProfileServiceImpl implements CabinetProfileService {
     private static final Logger logger = LoggerFactory.getLogger(CabinetProfileServiceImpl.class);
 
-    private static final String SERVICE_NAME = "cabinet";
+    private static final String CLIENT_NAME = "cabinet";
     private static final String AUTH_PROVIDER = "esia";
 
     private final Oauth2Flow oauth2Flow;
     private final PersonalDataService personalDataService;
     private final EsiaPublicKeyProvider esiaPublicKeyProvider;
     private final EsiaProperties esiaProperties;
+
+    private final String returnUrl;
+
+    private final NamedParameterJdbcTemplate jdbcTemplate;
+    private final XmlMapper xmlMapper;
 
     private JwtParser jwtParser;
 
@@ -50,7 +60,6 @@ public class CabinetProfileServiceImpl implements CabinetProfileService {
                 .setAllowedClockSkewSeconds(5);
     }
 
-    private final NamedParameterJdbcTemplate jdbcTemplate;
     //    private final SimpleJdbcCall getCabinetAuthorizationCodeJdbcCall;
     private final String CABINET_AUTH_CODE_SQL = "select wpms2_auth_wp.create_access_token(" +
             "  A_provider_user_id      => :A_provider_user_id " +
@@ -63,14 +72,18 @@ public class CabinetProfileServiceImpl implements CabinetProfileService {
 
     private final Map<String, Object> createAuthCodeCommonParams;
 
-    public CabinetProfileServiceImpl(Oauth2Flow oauth2Flow, PersonalDataService personalDataService
-            , EsiaPublicKeyProvider esiaPublicKeyProvider, EsiaProperties esiaProperties, NamedParameterJdbcTemplate jdbcTemplate) {
+    public CabinetProfileServiceImpl(Oauth2Flow oauth2Flow, PersonalDataService personalDataService,
+                                     EsiaPublicKeyProvider esiaPublicKeyProvider, EsiaProperties esiaProperties, ClientProperties clientProperties,
+                                     NamedParameterJdbcTemplate jdbcTemplate, XmlMapper xmlMapper) {
 
         this.oauth2Flow = oauth2Flow;
         this.personalDataService = personalDataService;
         this.esiaPublicKeyProvider = esiaPublicKeyProvider;
         this.esiaProperties = esiaProperties;
         this.jdbcTemplate = jdbcTemplate;
+        this.xmlMapper = xmlMapper;
+
+        this.returnUrl = clientProperties.getRegistration().get(CLIENT_NAME).getRedirectUri();
 
 //        this.getCabinetAuthorizationCodeJdbcCall = new SimpleJdbcCall(jdbcTemplate.getJdbcTemplate())
 //                .withoutProcedureColumnMetaDataAccess()
@@ -100,38 +113,58 @@ public class CabinetProfileServiceImpl implements CabinetProfileService {
 
         Map<String, Object> createAuthCodeCommonParamsLocal = new HashMap<>();
         createAuthCodeCommonParamsLocal.put("A_auth_provider", AUTH_PROVIDER);
-        createAuthCodeCommonParamsLocal.put("A_app_logical_name", SERVICE_NAME);
+        createAuthCodeCommonParamsLocal.put("A_app_logical_name", CLIENT_NAME);
         this.createAuthCodeCommonParams = Collections.unmodifiableMap(createAuthCodeCommonParamsLocal);
     }
 
     @Override
     public CabinetAuthorizationDto getCabinetAuthorizationCode(String esiaAuthorizationCode) {
-        AccessTokenDto esiaAccessTokenDto = oauth2Flow.getAccessToken(esiaAuthorizationCode);
+        AccessTokenDto esiaAccessTokenDto = oauth2Flow.getAccessToken(esiaAuthorizationCode, returnUrl);
 
         Jwt<Header, Claims> accessTokenJwt = parseAndCheckAccessTokenJwt(esiaAccessTokenDto.getAccessToken());
 
         long oid = accessTokenJwt.getBody().get("urn:esia:sbj_id", Long.class);
 
-        boolean profileFetchRequired = isProfileFetchRequired(oid);
-
-        if (profileFetchRequired) {
-            String profileXml = personalDataService.getProfileXml(oid, esiaAccessTokenDto);
-            registerProfile(oid, profileXml, "");
+        if (isProfileRegistrationRequired(oid)) {
+            registerProfile(oid, esiaAccessTokenDto, "");
         }
 
         String cabinetAuthorizationCode = getCabinetAuthorizationCode(oid, esiaAccessTokenDto);
 
         return new CabinetAuthorizationDto(oid, cabinetAuthorizationCode);
-
-//        return "oid: "+oid+"; profileFetchRequired: "+profileFetchRequired;
     }
 
-    private void registerProfile(long oid, String profileXml, String technicalLog) {
+
+    @Override
+    public String getProfileXml(long oid, AccessTokenDto esiaAccessTokenDto) {
+        ProfileJsonNode profileJsonNode = personalDataService.getProfileJsonNode(oid, esiaAccessTokenDto);
+        return profileJsonNodeToXml(oid, profileJsonNode);
+    }
+
+    private void registerProfile(long oid, AccessTokenDto esiaAccessTokenDto, String technicalLog) {
+        ProfileJsonNode profileJsonNode = personalDataService.getProfileJsonNode(oid, esiaAccessTokenDto);
+        PersonalDataDto personalData = personalDataService.extractPersonalData(profileJsonNode);
+
+        if (!personalData.isTrusted()) {
+            throw new ProfileIsNotTrustedException("Profile is not trusted", oid, personalData);
+        }
+
+        String profileXml = getProfileXml(oid, esiaAccessTokenDto);
+
         SqlParameterSource params = new MapSqlParameterSource()
                 .addValue("A_esia_oid", oid)
                 .addValue("A_data", profileXml)
                 .addValue("A_log_request", technicalLog);
         registerProfileJdbcCall.execute(params);
+    }
+
+    private String profileJsonNodeToXml(long oid, ProfileJsonNode profileJsonNode) {
+        ProfileJsonNodeXmlMapping profileJsonNodeXmlMapping = new ProfileJsonNodeXmlMapping(profileJsonNode);
+        try {
+            return xmlMapper.writerWithDefaultPrettyPrinter().writeValueAsString(profileJsonNodeXmlMapping);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Could not map ProfileJsonNode to xml {oid=" + oid + "}", e);
+        }
     }
 
     private String getCabinetAuthorizationCode(long oid, AccessTokenDto providerAccessTokenDto) {
@@ -184,7 +217,7 @@ public class CabinetProfileServiceImpl implements CabinetProfileService {
 
 
 
-    private boolean isProfileFetchRequired(long oid) {
+    private boolean isProfileRegistrationRequired(long oid) {
         String sql = "select wpms2_auth_wp.need_request_profile(A_provider_user_id => :oid, A_auth_provider => :auth_provider) from dual";
 
         SqlParameterSource params = new MapSqlParameterSource()

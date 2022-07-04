@@ -1,11 +1,13 @@
 server:
   port: 8080
-  servlet.context-path: /esia_debug
+  servlet.context-path: /authprovider
 
 
 esia:
   environment: test
   scopes: fullname, birthdate, gender, snils, id_doc, email, mobile
+
+  base-url: http://localhost:59185/authprovider
 
   #file path to ESIA public certificate for JWT verification
   certificate-path: ${ESIA_CERTIFICATE_PATH}
@@ -16,14 +18,15 @@ esia:
 
   client-id: ${ESIA_CLIENT_ID}
   #  client-certificate-hash: AAABBBCCC
-  #  return-url: http://localhost:${server.port}${server.servlet.context-path}/login/oauth2/code/esia
-  return-url: http://localhost:${server.port}${server.servlet.context-path}/login/oauth2/code/esia_debug
 
   keystore-alias: ${ESIA_KEYSTORE_ALIAS}
   keystore-password: ${ESIA_KEYSTORE_PASSWORD}
 
-  #  cabinet-redirect-url: http://127.0.0.1:7101/CabinetMain-CabinetViewController-context-root/token_auth_callback
-  cabinet-redirect-url: http://wl3n3.miit.ru:7003/cabinet/token_auth_callback
+  client:
+    registration:
+      cabinet:
+        #        redirect-uri: http://wl3n3.miit.ru:7003/cabinet/token_auth_callback
+        redirect-uri: http://127.0.0.1:7101/CabinetMain-CabinetViewController-context-root/token_auth_callback
 
 
 

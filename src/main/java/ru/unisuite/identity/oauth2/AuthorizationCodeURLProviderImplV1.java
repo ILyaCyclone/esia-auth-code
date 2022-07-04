@@ -43,16 +43,11 @@ public class AuthorizationCodeURLProviderImplV1 implements AuthorizationCodeURLP
         this.scope = esiaProperties.getScopesString();
 
 
-        baseAuthCodeUriBuilder = UriComponentsBuilder.fromHttpUrl(esiaProperties.getBaseUrl() + "/aas/oauth2/ac")
+        baseAuthCodeUriBuilder = UriComponentsBuilder.fromHttpUrl(esiaProperties.getEsiaBaseUrl() + "/aas/oauth2/ac")
                 .queryParam("client_id", esiaProperties.getClientId().toUpperCase())
                 .queryParam("scope", scope)
                 .queryParam("response_type", "code")
                 .queryParam("access_type", "offline"); // "offline" or "online"
-    }
-
-    @Override
-    public String generateAuthorizationCodeURL() {
-        return generateAuthorizationCodeURL(esiaProperties.getReturnUrl());
     }
 
     @Override

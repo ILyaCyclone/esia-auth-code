@@ -3,7 +3,6 @@ package ru.unisuite.identity.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,7 +34,6 @@ public class PersonalDataServiceImpl implements PersonalDataService {
     private final EsiaProperties esiaProperties;
 
     private final ObjectMapper jsonMapper;
-    private final XmlMapper xmlMapper;
     private final RestTemplate restTemplate;
 
     private String dataCollectionsUriTemplate;
@@ -43,7 +41,7 @@ public class PersonalDataServiceImpl implements PersonalDataService {
 
     @PostConstruct
     public void init() {
-        dataCollectionsUriTemplate = esiaProperties.getBaseUrl() + "/rs/prns/{oid}/{collectionType}";
+        dataCollectionsUriTemplate = esiaProperties.getEsiaBaseUrl() + "/rs/prns/{oid}/{collectionType}";
         dataCollectionsEmbeddedUriTemplate = dataCollectionsUriTemplate + "?embed=(elements)";
     }
 
@@ -73,7 +71,7 @@ public class PersonalDataServiceImpl implements PersonalDataService {
 
     @Override
     public PersonalDataDto getPersonalDataDto(long oid, AccessTokenDto accessTokenDto) throws JsonProcessingException {
-        String url = esiaProperties.getBaseUrl() + "/rs/prns/" + oid;
+        String url = esiaProperties.getEsiaBaseUrl() + "/rs/prns/" + oid;
         ResponseEntity<String> personalDataResponse = restTemplate.exchange(url, HttpMethod.GET
                 , authorizationRequestEntity(accessTokenDto), String.class);
         PersonalDataDto personalData = jsonMapper.readValue(personalDataResponse.getBody(), PersonalDataDto.class);
@@ -83,7 +81,7 @@ public class PersonalDataServiceImpl implements PersonalDataService {
 
     @Override
     public JsonNode getPersonalDataAsJsonNode(long oid, AccessTokenDto accessTokenDto) throws JsonProcessingException {
-        String url = esiaProperties.getBaseUrl() + "/rs/prns/" + oid;
+        String url = esiaProperties.getEsiaBaseUrl() + "/rs/prns/" + oid;
         ResponseEntity<String> personalDataResponse = restTemplate.exchange(url, HttpMethod.GET
                 , authorizationRequestEntity(accessTokenDto), String.class);
         return jsonMapper.readTree(personalDataResponse.getBody());
@@ -142,7 +140,7 @@ public class PersonalDataServiceImpl implements PersonalDataService {
     }
 
     @Override
-    public String getProfileXml(long oid, AccessTokenDto accessTokenDto) {
+    public ProfileJsonNode getProfileJsonNode(long oid, AccessTokenDto accessTokenDto) {
         try {
             JsonNode personalDataJsonNode = getPersonalDataAsJsonNode(oid, accessTokenDto);
             List<JsonNode> contactsJsonNode = getCollectionEmbeddedAsJsonNodes(oid, accessTokenDto, PersonDataCollectionType.CONTACTS);
@@ -156,15 +154,21 @@ public class PersonalDataServiceImpl implements PersonalDataService {
                         Scope.ADDRESSES, PersonDataCollectionType.ADDRESSES);
             }
 
-            ProfileJsonNode profileJsonNode = new ProfileJsonNode(personalDataJsonNode, addressesJsonNode
+            return new ProfileJsonNode(personalDataJsonNode, addressesJsonNode
                     , contactsJsonNode, documentsJsonNode);
-
-            String profileXml = xmlMapper.writerWithDefaultPrettyPrinter().writeValueAsString(profileJsonNode);
-            return profileXml;
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public PersonalDataDto extractPersonalData(ProfileJsonNode profileJsonNode) {
+        try {
+            return jsonMapper.treeToValue(profileJsonNode.getPersonalData(), PersonalDataDto.class);
+        } catch (JsonProcessingException e) {
+            throw new ProfileJsonNodeMappingException("Could not extract personal data", e, profileJsonNode);
         }
     }
 

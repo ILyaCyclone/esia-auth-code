@@ -14,18 +14,8 @@ public class Oauth2Flow implements AuthorizationCodeURLProvider, AccessTokenProv
 
 
     @Override
-    public String generateAuthorizationCodeURL() {
-        return authorizationCodeURLProvider.generateAuthorizationCodeURL();
-    }
-
-    @Override
     public String generateAuthorizationCodeURL(String returnUrl) {
         return authorizationCodeURLProvider.generateAuthorizationCodeURL(returnUrl);
-    }
-
-    @Override
-    public AccessTokenDto getAccessToken(String authorizationCode) {
-        return accessTokenProvider.getAccessToken(authorizationCode);
     }
 
     @Override

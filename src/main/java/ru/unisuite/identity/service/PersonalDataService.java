@@ -6,6 +6,7 @@ import ru.unisuite.identity.dto.AccessTokenDto;
 import ru.unisuite.identity.dto.ContactDto;
 import ru.unisuite.identity.dto.PersonalDataDto;
 import ru.unisuite.identity.profile.Contacts;
+import ru.unisuite.identity.profile.ProfileJsonNode;
 
 import java.util.List;
 
@@ -23,5 +24,7 @@ public interface PersonalDataService {
 
     List<JsonNode> getCollectionEmbeddedAsJsonNodes(long oid, AccessTokenDto accessTokenDto, PersonDataCollectionType collectionType) throws JsonProcessingException;
 
-    String getProfileXml(long oid, AccessTokenDto accessTokenDto);
+    ProfileJsonNode getProfileJsonNode(long oid, AccessTokenDto accessTokenDto);
+
+    PersonalDataDto extractPersonalData(ProfileJsonNode profileJsonNode);
 }

@@ -16,20 +16,12 @@ public class LogoutController {
 
     private final EsiaProperties esiaProperties;
 
-//    @Value("${server.port}")
-//    private int port;
-//
-//    @Value("${server.servlet.context-path}")
-//    private String contextPath;
-
     @GetMapping("/logout")
     public String logout() {
-//        String returnUrl = "http://localhost:" + port + "/" + contextPath;
-//        String returnUrl = "http://miit.ru/esia_debug";
-
+        String returnUrl = esiaProperties.getBaseUrl();
 //        String returnUrlEncoded = urlEncode(returnUrl);
 
-        return "redirect:" + esiaProperties.getBaseUrl() + "/idp/ext/Logout?client_id=" + esiaProperties.getClientId();
+        return "redirect:" + esiaProperties.getEsiaBaseUrl() + "/idp/ext/Logout?client_id=" + esiaProperties.getClientId();
 //                + "&redirect_url=" + returnUrlEncoded;
     }
 

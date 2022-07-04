@@ -45,7 +45,7 @@ public class AccessTokenProviderImplV1 implements AccessTokenProvider {
         this.cryptoSigner = cryptoSigner;
         this.esiaProperties = esiaProperties;
 
-        this.endpointUrl = esiaProperties.getBaseUrl() + "/aas/oauth2/te";
+        this.endpointUrl = esiaProperties.getEsiaBaseUrl() + "/aas/oauth2/te";
 
         this.scope = esiaProperties.getScopesString();
 
@@ -81,12 +81,6 @@ public class AccessTokenProviderImplV1 implements AccessTokenProvider {
      * идентификатором (<state>);
      *  <token_type> – тип запрашиваемого маркера, в настоящее время ЕСИА поддерживает только значение “Bearer
      */
-
-    @Override
-    public AccessTokenDto getAccessToken(String authorizationCode) {
-        return getAccessToken(authorizationCode, esiaProperties.getReturnUrl());
-    }
-
     @Override
     public AccessTokenDto getAccessToken(String authorizationCode, String returnUrl) {
         try {

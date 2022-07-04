@@ -14,6 +14,8 @@ import java.util.stream.Collectors;
 @Data
 public class EsiaProperties {
 
+    private final String baseUrl; // this service base url, not esia
+
     private final Environment environment;
 
     private final List<Scope> scopes;
@@ -27,7 +29,7 @@ public class EsiaProperties {
                 .collect(Collectors.joining(" "));
     }
 
-    public String getBaseUrl() {
+    public String getEsiaBaseUrl() {
         return environment.baseUrl;
     }
 
@@ -43,12 +45,9 @@ public class EsiaProperties {
 
     private final String clientId;
     private final String clientCertificateHash;
-    private final String returnUrl;
 
     private final String keystoreAlias;
     private final String keystorePassword;
-
-    private final String cabinetRedirectUrl;
 
     enum Environment {
         PROD("https://esia.gosuslugi.ru", "http://esia.gosuslugi.ru/"),
