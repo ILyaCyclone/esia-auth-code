@@ -150,7 +150,7 @@ public class CabinetProfileServiceImpl implements CabinetProfileService {
             PersonalDataDto personalData = personalDataService.extractPersonalData(profileJsonNode);
 
             if (!personalData.isTrusted()) {
-                throw new ProfileIsNotTrustedException("Profile is not trusted", oid, personalData);
+                throw new ProfileIsNotTrustedException("Profile is not trusted {oid=" + oid + '}', oid, personalData);
             }
 
             String profileXml = fetchProfileXml(oid, esiaAccessTokenDto);

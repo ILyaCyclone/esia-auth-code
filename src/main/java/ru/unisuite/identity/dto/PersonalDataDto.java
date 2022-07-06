@@ -46,6 +46,7 @@ public class PersonalDataDto implements Serializable {
     private String middleName;
     private String birthPlace;
     private boolean trusted;
+    private boolean verifying;
     private String citizenship;
     private String snils;
     private String inn;
@@ -58,7 +59,7 @@ public class PersonalDataDto implements Serializable {
     @JsonFormat(shape = JsonFormat.Shape.NUMBER)
     private Instant updatedOn;
 
-    enum Gender {
+    public enum Gender {
         M, F
     }
 
