@@ -1,1 +1,1 @@
-spring.config.import: /u01/scr/esia/esia-auth-code.yml
+spring.config.import: "/u01/scr/esia/esia-auth-code.yml"

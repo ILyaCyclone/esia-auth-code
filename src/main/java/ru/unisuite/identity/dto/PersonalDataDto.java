@@ -3,6 +3,7 @@ package ru.unisuite.identity.dto;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
 
+import java.io.Serializable;
 import java.time.Instant;
 import java.time.LocalDate;
 
@@ -38,7 +39,7 @@ import java.time.LocalDate;
  * - “AUTO_UPDATE_SUCCESS” – в случае успешного завершения автоматического обновления
  */
 @Data
-public class PersonalDataDto {
+public class PersonalDataDto implements Serializable {
     private Long rIdDoc;
     private String firstName;
     private String lastName;

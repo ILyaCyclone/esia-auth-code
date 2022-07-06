@@ -1,9 +1,9 @@
 package ru.unisuite.identity.cabinet;
 
-import lombok.Data;
+import lombok.Getter;
 import ru.unisuite.identity.dto.PersonalDataDto;
 
-@Data
+@Getter
 public class ProfileIsNotTrustedException extends RuntimeException {
 
     private final long oid;

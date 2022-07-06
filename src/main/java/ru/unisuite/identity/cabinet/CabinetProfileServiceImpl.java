@@ -6,6 +6,7 @@ import io.jsonwebtoken.*;
 import lombok.Data;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.SqlParameter;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -31,8 +32,8 @@ import java.util.stream.Stream;
 public class CabinetProfileServiceImpl implements CabinetProfileService {
     private static final Logger logger = LoggerFactory.getLogger(CabinetProfileServiceImpl.class);
 
-    private static final String CLIENT_NAME = "cabinet";
-    private static final String AUTH_PROVIDER = "esia";
+    private static final String CABINET_CLIENT_NAME = "cabinet";
+    private static final String ESIA_AUTH_PROVIDER_NAME = "esia";
 
     private final Oauth2Flow oauth2Flow;
     private final PersonalDataService personalDataService;
@@ -61,7 +62,7 @@ public class CabinetProfileServiceImpl implements CabinetProfileService {
     }
 
     //    private final SimpleJdbcCall getCabinetAuthorizationCodeJdbcCall;
-    private final String CABINET_AUTH_CODE_SQL = "select wpms2_auth_wp.create_access_token(" +
+    private static final String CABINET_AUTH_CODE_SQL = "select wpms2_auth_wp.create_access_token(" +
             "  A_provider_user_id      => :A_provider_user_id " +
             ", A_auth_provider         => :A_auth_provider " +
             ", A_app_logical_name      => :A_app_logical_name " +
@@ -83,7 +84,7 @@ public class CabinetProfileServiceImpl implements CabinetProfileService {
         this.jdbcTemplate = jdbcTemplate;
         this.xmlMapper = xmlMapper;
 
-        this.returnUrl = clientProperties.getRegistration().get(CLIENT_NAME).getRedirectUri();
+        this.returnUrl = clientProperties.getRegistration().get(CABINET_CLIENT_NAME).getRedirectUri();
 
 //        this.getCabinetAuthorizationCodeJdbcCall = new SimpleJdbcCall(jdbcTemplate.getJdbcTemplate())
 //                .withoutProcedureColumnMetaDataAccess()
@@ -112,8 +113,8 @@ public class CabinetProfileServiceImpl implements CabinetProfileService {
                 );
 
         Map<String, Object> createAuthCodeCommonParamsLocal = new HashMap<>();
-        createAuthCodeCommonParamsLocal.put("A_auth_provider", AUTH_PROVIDER);
-        createAuthCodeCommonParamsLocal.put("A_app_logical_name", CLIENT_NAME);
+        createAuthCodeCommonParamsLocal.put("A_auth_provider", ESIA_AUTH_PROVIDER_NAME);
+        createAuthCodeCommonParamsLocal.put("A_app_logical_name", CABINET_CLIENT_NAME);
         this.createAuthCodeCommonParams = Collections.unmodifiableMap(createAuthCodeCommonParamsLocal);
     }
 
@@ -123,9 +124,11 @@ public class CabinetProfileServiceImpl implements CabinetProfileService {
 
         Jwt<Header, Claims> accessTokenJwt = parseAndCheckAccessTokenJwt(esiaAccessTokenDto.getAccessToken());
 
-        long oid = accessTokenJwt.getBody().get("urn:esia:sbj_id", Long.class);
+        long oid = extractOidFromAccessTokenJwt(accessTokenJwt);
 
-        if (isProfileRegistrationRequired(oid)) {
+        boolean profileRegistrationRequired = checkProfileRegistrationRequired(oid);
+
+        if (profileRegistrationRequired) {
             registerProfile(oid, esiaAccessTokenDto, "");
         }
 
@@ -136,34 +139,51 @@ public class CabinetProfileServiceImpl implements CabinetProfileService {
 
 
     @Override
-    public String getProfileXml(long oid, AccessTokenDto esiaAccessTokenDto) {
+    public String fetchProfileXml(long oid, AccessTokenDto esiaAccessTokenDto) {
         ProfileJsonNode profileJsonNode = personalDataService.getProfileJsonNode(oid, esiaAccessTokenDto);
         return profileJsonNodeToXml(oid, profileJsonNode);
     }
 
     private void registerProfile(long oid, AccessTokenDto esiaAccessTokenDto, String technicalLog) {
-        ProfileJsonNode profileJsonNode = personalDataService.getProfileJsonNode(oid, esiaAccessTokenDto);
-        PersonalDataDto personalData = personalDataService.extractPersonalData(profileJsonNode);
+        try {
+            ProfileJsonNode profileJsonNode = personalDataService.getProfileJsonNode(oid, esiaAccessTokenDto);
+            PersonalDataDto personalData = personalDataService.extractPersonalData(profileJsonNode);
 
-        if (!personalData.isTrusted()) {
-            throw new ProfileIsNotTrustedException("Profile is not trusted", oid, personalData);
+            if (!personalData.isTrusted()) {
+                throw new ProfileIsNotTrustedException("Profile is not trusted", oid, personalData);
+            }
+
+            String profileXml = fetchProfileXml(oid, esiaAccessTokenDto);
+
+            SqlParameterSource params = new MapSqlParameterSource()
+                    .addValue("A_esia_oid", oid)
+                    .addValue("A_data", profileXml)
+                    .addValue("A_log_request", technicalLog);
+            registerProfileJdbcCall.execute(params);
+        } catch (ProfileIsNotTrustedException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new CabinetProfileServiceException("Could not registerProfile {oid=" + oid + '}', e);
         }
-
-        String profileXml = getProfileXml(oid, esiaAccessTokenDto);
-
-        SqlParameterSource params = new MapSqlParameterSource()
-                .addValue("A_esia_oid", oid)
-                .addValue("A_data", profileXml)
-                .addValue("A_log_request", technicalLog);
-        registerProfileJdbcCall.execute(params);
     }
+
+
+    private Long extractOidFromAccessTokenJwt(Jwt<Header, Claims> accessTokenJwt) {
+        try {
+            return accessTokenJwt.getBody().get("urn:esia:sbj_id", Long.class);
+        } catch (Exception e) {
+            throw new CabinetProfileServiceException("Could not extract oid from access token {access token body='" +
+                    accessTokenJwt.getBody() + '}', e);
+        }
+    }
+
 
     private String profileJsonNodeToXml(long oid, ProfileJsonNode profileJsonNode) {
         ProfileJsonNodeXmlMapping profileJsonNodeXmlMapping = new ProfileJsonNodeXmlMapping(profileJsonNode);
         try {
             return xmlMapper.writerWithDefaultPrettyPrinter().writeValueAsString(profileJsonNodeXmlMapping);
         } catch (JsonProcessingException e) {
-            throw new RuntimeException("Could not map ProfileJsonNode to xml {oid=" + oid + "}", e);
+            throw new CabinetProfileServiceException("Could not map ProfileJsonNode to xml {oid=" + oid + "}", e);
         }
     }
 
@@ -172,8 +192,12 @@ public class CabinetProfileServiceImpl implements CabinetProfileService {
                 .addValue("A_provider_user_id", oid)
                 .addValue("A_provider_access_token", providerAccessTokenDto.getAccessToken());
 
+        try {
 //        return getCabinetAuthorizationCodeJdbcCall.executeFunction(String.class, params);
-        return jdbcTemplate.queryForObject(CABINET_AUTH_CODE_SQL, params, String.class);
+            return jdbcTemplate.queryForObject(CABINET_AUTH_CODE_SQL, params, String.class);
+        } catch (DataAccessException e) {
+            throw new CabinetProfileServiceException("Could not getCabinetAuthorizationCode {oid=" + oid + '}', e);
+        }
     }
 
 
@@ -217,13 +241,17 @@ public class CabinetProfileServiceImpl implements CabinetProfileService {
 
 
 
-    private boolean isProfileRegistrationRequired(long oid) {
+    private boolean checkProfileRegistrationRequired(long oid) {
         String sql = "select wpms2_auth_wp.need_request_profile(A_provider_user_id => :oid, A_auth_provider => :auth_provider) from dual";
 
         SqlParameterSource params = new MapSqlParameterSource()
                 .addValue("oid", oid)
-                .addValue("auth_provider", AUTH_PROVIDER);
+                .addValue("auth_provider", ESIA_AUTH_PROVIDER_NAME);
 
-        return Integer.valueOf(1).equals(jdbcTemplate.queryForObject(sql, params, Integer.class));
+        try {
+            return Integer.valueOf(1).equals(jdbcTemplate.queryForObject(sql, params, Integer.class));
+        } catch (Exception e) {
+            throw new CabinetProfileServiceException("Could not checkProfileRegistrationRequired {oid=" + oid + '}', e);
+        }
     }
 }

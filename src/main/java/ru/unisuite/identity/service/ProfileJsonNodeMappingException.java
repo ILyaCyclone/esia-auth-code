@@ -1,9 +1,9 @@
 package ru.unisuite.identity.service;
 
-import lombok.Data;
+import lombok.Getter;
 import ru.unisuite.identity.profile.ProfileJsonNode;
 
-@Data
+@Getter
 public class ProfileJsonNodeMappingException extends RuntimeException {
     private final ProfileJsonNode profileJsonNode;
 

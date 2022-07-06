@@ -105,7 +105,7 @@ public class PersonalDataServiceImpl implements PersonalDataService {
                     ResponseEntity<String> elementResponseEntity = restTemplate.exchange(elementUrl, HttpMethod.GET
                             , requestEntity, String.class);
                     String elementResponseString = elementResponseEntity.getBody();
-                    logger.debug(elementResponseString);
+                    logger.trace(elementResponseString);
 
                     return mapCollectionElement(elementResponseString, resultClass);
                 })
@@ -150,16 +150,12 @@ public class PersonalDataServiceImpl implements PersonalDataService {
                 addressesJsonNode = getCollectionEmbeddedAsJsonNodes(oid, accessTokenDto, PersonDataCollectionType.ADDRESSES);
             } else {
                 addressesJsonNode = Collections.emptyList();
-                logger.warn("Scopes do not contain '{}', so '{}' personal data collection won't be fetched",
-                        Scope.ADDRESSES, PersonDataCollectionType.ADDRESSES);
             }
 
             return new ProfileJsonNode(personalDataJsonNode, addressesJsonNode
                     , contactsJsonNode, documentsJsonNode);
-        } catch (RuntimeException e) {
-            throw e;
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new EsiaAccessException("Could not get ProfileJsonNode {oid=" + oid + '}', e);
         }
     }
 
@@ -176,8 +172,8 @@ public class PersonalDataServiceImpl implements PersonalDataService {
 
     private void validateCollectionElementUrl(String url) {
         // http(s)://(xxx.)gosuslugi.ru(/xxx)
-        if (!url.matches("https?:\\/\\/(.+?\\.)?gosuslugi\\.ru($|\\/.+)")) {
-            throw new RuntimeException("Collection URL is not safe `" + url + '\'');
+        if (!url.matches("https?://(.+?\\.)?gosuslugi\\.ru($|/.+)")) {
+            throw new EsiaAccessException("Collection URL is not safe `" + url + '\'');
         }
     }
 
@@ -185,7 +181,9 @@ public class PersonalDataServiceImpl implements PersonalDataService {
         try {
             return jsonMapper.readValue(elementResponseString, resultClass);
         } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
+            throw new EsiaAccessException("Could not map to " + resultClass + " class following String: '"
+                    + (elementResponseString.length() > 100 ? elementResponseString.substring(0, 99) + "…" : elementResponseString)
+                    + "'", e);
         }
     }
 
@@ -193,7 +191,8 @@ public class PersonalDataServiceImpl implements PersonalDataService {
         try {
             return jsonMapper.treeToValue(elementJsonNode, resultClass);
         } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
+            throw new EsiaAccessException("Could not map to " + resultClass + " class following JsonNode: '"
+                    + elementJsonNode + '\'', e);
         }
     }
 

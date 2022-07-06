@@ -38,6 +38,6 @@ spring:
     driver-class-name: oracle.jdbc.OracleDriver
 
 logging.level:
-  ru.unisuite.identity: DEBUG
+  ru.unisuite.identity: TRACE
   org.springframework:
     web.client.RestTemplate: DEBUG

@@ -18,7 +18,7 @@ public class LogoutController {
 
     @GetMapping("/logout")
     public String logout() {
-        String returnUrl = esiaProperties.getBaseUrl();
+//        String returnUrl = esiaProperties.getBaseUrl();
 //        String returnUrlEncoded = urlEncode(returnUrl);
 
         return "redirect:" + esiaProperties.getEsiaBaseUrl() + "/idp/ext/Logout?client_id=" + esiaProperties.getClientId();

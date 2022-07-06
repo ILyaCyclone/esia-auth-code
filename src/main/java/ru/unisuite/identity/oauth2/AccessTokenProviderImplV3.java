@@ -122,7 +122,8 @@ public class AccessTokenProviderImplV3 implements AccessTokenProvider {
             logger.debug("fetching esia access token, post body parameters: {}", postBody);
             AccessTokenDto accessTokenDto = restTemplate.postForObject(endpointUrl, postBody, AccessTokenDto.class);
 
-            logger.debug("accessTokenDto: {}", accessTokenDto);
+            logger.debug("accessToken received");
+            logger.trace("accessTokenDto: {}", accessTokenDto);
 
             return accessTokenDto;
         } catch (HttpClientErrorException e) {

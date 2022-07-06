@@ -215,7 +215,7 @@ public class DebugOutputController {
             documentDtos.forEach(dto -> joiner.add(dto.toString()));
 
 
-            String profileXml = cabinetProfileService.getProfileXml(oid, accessTokenDto);
+            String profileXml = cabinetProfileService.fetchProfileXml(oid, accessTokenDto);
 
             joiner.add("xml:");
             joiner.add(profileXml);

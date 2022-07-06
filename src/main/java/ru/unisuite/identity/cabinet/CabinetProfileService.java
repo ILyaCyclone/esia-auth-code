@@ -6,6 +6,6 @@ public interface CabinetProfileService {
 
     CabinetAuthorizationDto getCabinetAuthorizationCode(String esiaAuthorizationCode);
 
-    String getProfileXml(long oid, AccessTokenDto accessTokenDto);
+    String fetchProfileXml(long oid, AccessTokenDto accessTokenDto);
 
 }
