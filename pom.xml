@@ -10,9 +10,9 @@
   </parent>
 
   <groupId>ru.unisuite</groupId>
-  <artifactId>identity</artifactId>
-  <version>0.0.1-SNAPSHOT</version>
-  <name>identity</name>
+  <artifactId>authprovider</artifactId>
+  <version>1.0.0</version>
+  <name>authprovider</name>
   <packaging>war</packaging>
   <properties>
     <java.version>1.8</java.version>
@@ -63,6 +63,11 @@
       <artifactId>spring-boot-starter-tomcat</artifactId>
       <scope>provided</scope>
     </dependency>
+    <!-- for error page -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-thymeleaf</artifactId>
+    </dependency>
 
     <dependency>
       <groupId>org.springframework.boot</groupId>
@@ -103,7 +108,7 @@
   </dependencies>
 
   <build>
-    <finalName>aa_esia-auth-code</finalName>
+    <finalName>aa_authprovider</finalName>
 
     <plugins>
       <plugin>
