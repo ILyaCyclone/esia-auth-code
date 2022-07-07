@@ -5,12 +5,11 @@ server:
 
 esia:
   environment: test
+  certificate-path: ${ESIA_CERTIFICATE_PATH}
+
   scopes: fullname, birthdate, gender, snils, id_doc, email, mobile
 
   base-url: http://localhost:59185/authprovider
-
-  #file path to ESIA public certificate for JWT verification
-  certificate-path: ${ESIA_CERTIFICATE_PATH}
 
   connect-timeout: 1m
   read-timeout: 1m
@@ -28,7 +27,16 @@ esia:
         #        redirect-uri: http://wl3n3.miit.ru:7003/cabinet/token_auth_callback
         redirect-uri: http://127.0.0.1:7101/CabinetMain-CabinetViewController-context-root/token_auth_callback
 
-
+#  logging:
+#    console:
+#      format: plaintext
+#      json.pretty: true
+#    file:
+#      path: "d:\\temp\\esialogs"
+#      plaintext.enabled: true
+#      json:
+#        enabled: true
+#        pretty: false
 
 spring:
   datasource:
@@ -37,7 +45,8 @@ spring:
     password: ${esia.db.password}
     driver-class-name: oracle.jdbc.OracleDriver
 
-logging.level:
-  ru.unisuite.identity: TRACE
-  org.springframework:
-    web.client.RestTemplate: DEBUG
+logging:
+  level:
+    ru.unisuite.identity: TRACE
+    org.springframework:
+      web.client.RestTemplate: DEBUG

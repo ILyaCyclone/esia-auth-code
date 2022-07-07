@@ -1,0 +1,105 @@
+<!--
+esia.logging.console.format - plaintext, json, off (default: plaintext)
+esia.logging.console.json.pretty - true, false (default: true)
+esia.logging.file.plaintext.enabled - true, false (default: false)
+esia.logging.file.json.enabled - true, false (default: false)
+esia.logging.file.json.pretty - true, false (default: false)
+-->
+
+<configuration>
+  <property name="appName" value="authprovider"/>
+
+  <springProperty name="consoleFormat" source="esia.logging.console.format" defaultValue="plaintext"/>
+  <springProperty name="consoleJsonPretty" source="esia.logging.console.json.pretty" defaultValue="true"/>
+  <springProperty name="filePlaintextEnabled" source="esia.logging.file.plaintext.enabled" defaultValue="false"/>
+  <springProperty name="fileJsonEnabled" source="esia.logging.file.json.enabled" defaultValue="false"/>
+  <springProperty name="fileJsonPretty" source="esia.logging.file.json.pretty" defaultValue="false"/>
+
+  <!-- standard spring pattern + MDC -->
+  <property name="CONSOLE_LOG_PATTERN"
+            value="${CONSOLE_LOG_PATTERN:-%clr(%d{${LOG_DATEFORMAT_PATTERN:-yyyy-MM-dd HH:mm:ss.SSS}}){faint} %clr(${LOG_LEVEL_PATTERN:-%5p}) %clr(${PID:- }){magenta} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %clr({%mdc}){faint} %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}}"/>
+  <property name="FILE_LOG_PATTERN"
+            value="${FILE_LOG_PATTERN:-%d{${LOG_DATEFORMAT_PATTERN:-yyyy-MM-dd'T'HH:mm:ss.SSSXXX}} ${LOG_LEVEL_PATTERN:-%5p} ${PID:- } --- [%t] %-40.40logger{39} : {%mdc} %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}}"/>
+
+
+  <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+<!--  <property name="LOG_FILE" value="${LOG_FILE:-${LOG_PATH:-${LOG_TEMP:-${java.io.tmpdir:-/tmp}}}/${appName}.log}"/>-->
+  <property name="LOG_FILE" value="${LOG_PATH}/${appName}.log"/>
+
+  <if condition='p("consoleFormat").equals("plaintext")'>
+    <then>
+      <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+    </then>
+  </if>
+
+  <if condition='p("consoleFormat").equals("json")'>
+    <then>
+      <appender name="CONSOLE_JSON" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+          <if condition='p("consoleJsonPretty").equals("true")'>
+            <then>
+              <jsonGeneratorDecorator class="net.logstash.logback.decorate.PrettyPrintingJsonGeneratorDecorator"/>
+            </then>
+          </if>
+        </encoder>
+      </appender>
+    </then>
+  </if>
+
+  <if condition='p("filePlaintextEnabled").equals("true")'>
+    <then>
+      <include resource="org/springframework/boot/logging/logback/file-appender.xml"/>
+    </then>
+  </if>
+
+
+  <if condition='p("fileJsonEnabled").equals("true")'>
+    <then>
+      <appender name="FILE_JSON" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+          <if condition='p("fileJsonPretty").equals("true")'>
+            <then>
+              <jsonGeneratorDecorator class="net.logstash.logback.decorate.PrettyPrintingJsonGeneratorDecorator"/>
+            </then>
+          </if>
+        </encoder>
+
+        <file>${LOG_PATH}/json/${appName}.json.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+          <fileNamePattern>${appName}.json.%d{yyyy-MM-dd}.%i.gz</fileNamePattern>
+          <cleanHistoryOnStart>${LOGBACK_ROLLINGPOLICY_CLEAN_HISTORY_ON_START:-false}</cleanHistoryOnStart>
+          <maxFileSize>${LOGBACK_ROLLINGPOLICY_MAX_FILE_SIZE:-10MB}</maxFileSize>
+          <totalSizeCap>${LOGBACK_ROLLINGPOLICY_TOTAL_SIZE_CAP:-0}</totalSizeCap>
+          <maxHistory>${LOGBACK_ROLLINGPOLICY_MAX_HISTORY:-7}</maxHistory>
+        </rollingPolicy>
+      </appender>
+    </then>
+  </if>
+
+
+  <root level="INFO">
+    <if condition='p("consoleFormat").equals("plaintext")'>
+      <then>
+        <appender-ref ref="CONSOLE"/>
+      </then>
+    </if>
+
+    <if condition='p("consoleFormat").equals("json")'>
+      <then>
+        <appender-ref ref="CONSOLE_JSON"/>
+      </then>
+    </if>
+
+    <if condition='p("filePlaintextEnabled").equals("true")'>
+      <then>
+        <appender-ref ref="FILE"/>
+      </then>
+    </if>
+
+    <if condition='p("fileJsonEnabled").equals("true")'>
+      <then>
+        <appender-ref ref="FILE_JSON"/>
+      </then>
+    </if>
+  </root>
+</configuration>

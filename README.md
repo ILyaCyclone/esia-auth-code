@@ -36,7 +36,7 @@ http://esia.gosuslugi.ru/public/esia.zip (ссылка указана в док�
 Распакуйте архив и расположите файл с публичным сертификатом (например, RSA_TESIA.cer для тестовой среды) в файловой
 системе.
 
-## Запуск
+## Конфигурация
 
 Для работы приложения требуются следующие переменные среды:
 
@@ -58,6 +58,16 @@ ESIA_CONNECT_TIMEOUT | таймаут установки соединения HT
 ESIA_CLIENT_ID | таймаут чтения ответа HTTP-запроса к ЕСИА (значение в Duration<sup>1</sup>) | 1m
 ESIA_RETURN_URL | URL возврата после прохождения авторизации в ЕСИА | http://localhost:${server.port}${server.servlet.context-path}/login/oauth2/code/esia_debug
 ESIA_CABINET_REDIRECT_URL | URL редиректа в приложение Cabinet | http://wl3n3.miit.ru:7003/cabinet/token_auth_callback
+
+Логирование:
+
+esia.logging.console.format - plaintext, json, off (default: plaintext)  
+esia.logging.console.json.pretty - true, false (default: true)  
+esia.logging.file.plaintext.enabled - true, false (default: false)  
+esia.logging.file.json.enabled - true, false (default: false)  
+esia.logging.file.json.pretty - true, false (default: false)
+
+## Запуск
 
 Для запуска выполните `mvn spring-boot:run` или используйте любой другой способ запуска Spring Boot приложения.  
 Помните, что для запуска необходима JDK (JRE) с установленным КриптоПро JCP.

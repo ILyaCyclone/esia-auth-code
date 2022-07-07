@@ -20,6 +20,9 @@
     <!--    <jjwt.version>0.11.2</jjwt.version>-->
     <jjwt.version>0.9.1</jjwt.version>
     <ojdbc6.version>11.2.0.4</ojdbc6.version>
+    <jackson-dataformat-xml.version>2.11.4</jackson-dataformat-xml.version>
+    <logstash-logback-encoder.version>7.2</logstash-logback-encoder.version>
+    <janino.version>3.1.7</janino.version>
   </properties>
 
 
@@ -42,14 +45,10 @@
     </dependency>
 
 
-    <!--    <dependency>-->
-    <!--      <groupId>com.fasterxml.jackson.dataformat</groupId>-->
-    <!--      <artifactId>jackson-dataformat-xml</artifactId>-->
-    <!--    </dependency>-->
     <dependency>
       <groupId>com.fasterxml.jackson.dataformat</groupId>
       <artifactId>jackson-dataformat-xml</artifactId>
-      <version>2.11.4</version>
+      <version>${jackson-dataformat-xml.version}</version>
     </dependency>
 
 
@@ -89,16 +88,33 @@
 
 
     <dependency>
+      <groupId>org.projectlombok</groupId>
+      <artifactId>lombok</artifactId>
+      <optional>true</optional>
+    </dependency>
+
+    <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-devtools</artifactId>
       <scope>runtime</scope>
       <optional>true</optional>
     </dependency>
+
+    <!-- json logging -->
     <dependency>
-      <groupId>org.projectlombok</groupId>
-      <artifactId>lombok</artifactId>
-      <optional>true</optional>
+      <groupId>net.logstash.logback</groupId>
+      <artifactId>logstash-logback-encoder</artifactId>
+      <version>${logstash-logback-encoder.version}</version>
+      <scope>runtime</scope>
     </dependency>
+    <!-- logback conditions -->
+    <dependency>
+      <groupId>org.codehaus.janino</groupId>
+      <artifactId>janino</artifactId>
+      <version>${janino.version}</version>
+      <scope>runtime</scope>
+    </dependency>
+
 
     <dependency>
       <groupId>org.springframework.boot</groupId>
