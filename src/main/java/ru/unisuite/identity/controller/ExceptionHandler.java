@@ -5,6 +5,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import ru.unisuite.identity.cabinet.ProfileIsNotTrustedException;
 import ru.unisuite.identity.dto.PersonalDataDto;
+import ru.unisuite.identity.service.ConsentDeclinedException;
 
 import java.util.StringJoiner;
 
@@ -12,7 +13,7 @@ import java.util.StringJoiner;
 public class ExceptionHandler {
 
     @org.springframework.web.bind.annotation.ExceptionHandler(ProfileIsNotTrustedException.class)
-    ResponseEntity<String> handleProfileIsNotTrustedException(ProfileIsNotTrustedException e) {
+    public ResponseEntity<String> handleProfileIsNotTrustedException(ProfileIsNotTrustedException e) {
         PersonalDataDto personalData = e.getPersonalData();
         boolean isVerifying = personalData.isVerifying();
 
@@ -25,12 +26,25 @@ public class ExceptionHandler {
             reply += "\nВ настоящее время происходит процесс проверки данных на стороне \"Госуслуг\"." +
                     " Попробуйте выполнить вход позднее.";
         } else {
-            reply += "\nСледуйте инструкциям на сайте \"Госуслуг\" для подтверждения учётной записи.";
+            reply += "\nСледуйте инструкциям на портале \"Госуслуг\" для подтверждения учётной записи.";
         }
 
-        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+        return replyWithText(HttpStatus.FORBIDDEN, reply);
+    }
+
+
+    @org.springframework.web.bind.annotation.ExceptionHandler(ConsentDeclinedException.class)
+    public ResponseEntity<String> handleConsentDeclinedException(ConsentDeclinedException e) {
+        return replyWithText(HttpStatus.FORBIDDEN,
+                "Для входа в Личный кабинет с помощью портала \"Госуслуг\" необходимо предоставить " +
+                        "университету права на чтение данных Вашего профиля");
+    }
+
+
+    private ResponseEntity<String> replyWithText(HttpStatus httpStatus, String text) {
+        return ResponseEntity.status(httpStatus)
                 .header("Content-Type", "text/plain; charset=UTF-8")
-                .body(reply);
+                .body(text);
     }
 
 }

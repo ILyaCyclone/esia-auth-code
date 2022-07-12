@@ -12,17 +12,19 @@ import ru.unisuite.identity.cabinet.CabinetAuthorizationDto;
 import ru.unisuite.identity.cabinet.CabinetProfileService;
 import ru.unisuite.identity.config.ClientProperties;
 import ru.unisuite.identity.config.ClientRegistration;
+import ru.unisuite.identity.service.ConsentDeclinedException;
 import ru.unisuite.identity.service.EsiaAccessException;
 
 import java.util.Objects;
 
 @Controller
 @RequiredArgsConstructor
-public class OauthReturnController {
+public class OAuth2LoginAuthenticationController {
 
     private final ClientProperties clientProperties;
     private final CabinetProfileService cabinetProfileService;
 
+    // path according to Spring OAuth2LoginAuthenticationFilter
     @GetMapping("/login/oauth2/code/{provider}")
     public RedirectView redirectToClientApplication(@PathVariable("provider") String identityProviderAliasParam
             , @RequestParam("client") String clientApplicationAliasParam
@@ -38,6 +40,11 @@ public class OauthReturnController {
         }
 
         if (!StringUtils.hasText(authorizationCode)) {
+
+            if (errorDescription != null && errorDescription.contains("ESIA-007004")) {
+                throw new ConsentDeclinedException();
+            }
+
             throw new EsiaAccessException("Authorization code not received. Error: '" + error
                     + "'. Description: '" + errorDescription + "'.");
         }

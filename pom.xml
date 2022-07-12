@@ -11,7 +11,7 @@
 
   <groupId>ru.unisuite</groupId>
   <artifactId>authprovider</artifactId>
-  <version>1.0.0</version>
+  <version>1.0.1</version>
   <name>authprovider</name>
   <packaging>war</packaging>
   <properties>

@@ -17,14 +17,16 @@ import java.util.Objects;
 
 @Controller
 @RequiredArgsConstructor
-public class OauthRedirectController {
-    private static final Logger logger = LoggerFactory.getLogger(OauthRedirectController.class);
+public class OAuth2AuthorizationRequestController {
+    private static final Logger logger = LoggerFactory.getLogger(OAuth2AuthorizationRequestController.class);
 
     private final Oauth2Flow oauth2Flow;
     private final ClientProperties clientProperties;
     private final EsiaProperties esiaProperties;
 
-    @GetMapping("/oauth/{provider}")
+    // default path according to Spring OAuth2AuthorizationRequestRedirectFilter is "/oauth2/authorization/{registrationId}"
+    // TODO "/oauth/{provider}" should be removed
+    @GetMapping(path = {"/oauth/{provider}", "/oauth2/authorization/{provider}"})
     public RedirectView redirectToProvider(@PathVariable("provider") String identityProviderAliasParam
             , @RequestParam("client") String clientApplicationAliasParam) {
 
@@ -50,7 +52,6 @@ public class OauthRedirectController {
 
         logger.debug("Provider '{}', client '{}',", identityProviderAliasParam, clientApplicationAliasParam);
 
-//        String returnUrl = identityProperties.getBaseUrl() + "/login/oauth2/code/" + identityProviderAlias + "?client=" + clientApplicationAlias;
         String returnUrl = esiaProperties.getBaseUrl() + "/login/oauth2/code/" + identityProviderAliasParam + "?client=" + clientApplicationAliasParam;
         String authorizationUri = oauth2Flow.generateAuthorizationCodeURL(returnUrl);
 
