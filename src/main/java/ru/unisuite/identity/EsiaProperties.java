@@ -42,6 +42,7 @@ public class EsiaProperties {
 
     private final Duration connectTimeout;
     private final Duration readTimeout;
+    private final int jwtAllowedClockSkewSeconds;
 
     private final String clientId;
     private final String clientCertificateHash;

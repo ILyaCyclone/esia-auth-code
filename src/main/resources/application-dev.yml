@@ -9,10 +9,7 @@ esia:
 
   scopes: fullname, birthdate, gender, snils, id_doc, email, mobile
 
-  base-url: http://localhost:59185/authprovider
-
-  connect-timeout: 1m
-  read-timeout: 1m
+  base-url: http://localhost:${server.port}${server.servlet.context-path}
 
 
   client-id: ${ESIA_CLIENT_ID}

@@ -1,1 +1,6 @@
 logging.file.path: ${esia.logging.file.path:}
+
+esia:
+  connect-timeout: 1m
+  read-timeout: 1m
+  jwt-allowed-clock-skew-seconds: 30

@@ -50,35 +50,32 @@ ESIA_KEYSTORE_ALIAS | алиас ключевой пары в контейнер
 ESIA_KEYSTORE_PASSWORD | пароль ключевой пары в контейнере
 ESIA_CERTIFICATE_PATH | путь в файловой системе к файлу с публичным сертификатом ЕСИА
 
-Дополнительно:
+### Приложения-клиенты
+
+Приложения, запрашивающие аутентификацию (приложения-клиенты) задаются в конфигурации в формате:  
+`esia.client.registration.{clientApplicationId}.redirect-uri` - URL возврата после прохождения аутентификации в
+провайдере
+
+Пример:
+`esia.client.registration.cabinet.redirect-uri: http://localhost:7101/cabinet`
+
+### Дополнительно
 
 Переменная | Описание | Значение по умолчанию
 --- | --- | ---
-ESIA_CONNECT_TIMEOUT | таймаут установки соединения HTTP-запроса к ЕСИА (значение в Duration<sup>1</sup>) | 1m
-ESIA_CLIENT_ID | таймаут чтения ответа HTTP-запроса к ЕСИА (значение в Duration<sup>1</sup>) | 1m
-ESIA_RETURN_URL | URL возврата после прохождения авторизации в ЕСИА | http://localhost:${server.port}${server.servlet.context-path}/login/oauth2/code/esia_debug
-ESIA_CABINET_REDIRECT_URL | URL редиректа в приложение Cabinet | http://wl3n3.miit.ru:7003/cabinet/token_auth_callback
+ESIA_BASE_URL | базовая часть URL возврата после прохождения аутентификации в провайдере | http://localhost:${server.port}${server.servlet.context-path}
+ESIA_CONNECT_TIMEOUT | таймаут установки соединения HTTP-запроса к провайдеру аутентификации (значение в Duration<sup>1</sup>) | 1m
+ESIA_READ_TIMEOUT | таймаут чтения ответа HTTP-запроса к провайдеру аутентификации (значение в Duration<sup>1</sup>) | 1m
+ESIA_JWT_ALLOWED_CLOCK_SKEW_SECONDS | допустимое отклонение секунд при проверке времени жизни jwt токена | 30
 
-Логирование:
+### Логирование
 
 esia.logging.console.format - plaintext, json, off (default: plaintext)  
 esia.logging.console.json.pretty - true, false (default: true)  
+esia.logging.file.path - path to folder for log files  
 esia.logging.file.plaintext.enabled - true, false (default: false)  
 esia.logging.file.json.enabled - true, false (default: false)  
 esia.logging.file.json.pretty - true, false (default: false)
-
-## Запуск
-
-Для запуска выполните `mvn spring-boot:run` или используйте любой другой способ запуска Spring Boot приложения.  
-Помните, что для запуска необходима JDK (JRE) с установленным КриптоПро JCP.
-
-После запуска откройте в браузере http://localhost:8080.  
-Нажмите `login with esia`. Пройдите авторизацию (тестовой) записью и подтвердите запрошенные разрешения.  
-Вы будете перенаправлены обратно на страницу приложения.
-
-При успехе Вы увидите авторизационный код, маркер доступа, а также персональные
-
-При неудаче - сообщение об ошибке и описание ошибки.
 
 ## Troubleshooting
 

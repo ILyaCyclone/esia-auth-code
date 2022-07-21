@@ -55,10 +55,11 @@ public class CabinetProfileServiceImpl implements CabinetProfileService {
 
     @PostConstruct
     public void init() {
-        jwtParser = Jwts.parser().setSigningKey(esiaPublicKeyProvider.getPublicKey())
+        jwtParser = Jwts.parserBuilder().setSigningKey(esiaPublicKeyProvider.getPublicKey())
                 .requireIssuer(esiaProperties.getIssuer())
                 .require("client_id", esiaProperties.getClientId())
-                .setAllowedClockSkewSeconds(5);
+                .setAllowedClockSkewSeconds(esiaProperties.getJwtAllowedClockSkewSeconds())
+                .build();
     }
 
     //    private final SimpleJdbcCall getCabinetAuthorizationCodeJdbcCall;
