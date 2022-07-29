@@ -33,14 +33,11 @@ import java.util.stream.Stream;
 public class CabinetProfileServiceImpl implements CabinetProfileService {
     private static final Logger logger = LoggerFactory.getLogger(CabinetProfileServiceImpl.class);
 
-    private static final String CABINET_CLIENT_NAME = "cabinet";
-
     private final Oauth2Flow oauth2Flow;
     private final PersonalDataService personalDataService;
     private final EsiaPublicKeyProvider esiaPublicKeyProvider;
     private final EsiaProperties esiaProperties;
-
-    private final String returnUrl;
+    private final ClientProperties clientProperties;
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
     private final XmlMapper xmlMapper;
@@ -80,10 +77,9 @@ public class CabinetProfileServiceImpl implements CabinetProfileService {
         this.personalDataService = personalDataService;
         this.esiaPublicKeyProvider = esiaPublicKeyProvider;
         this.esiaProperties = esiaProperties;
+        this.clientProperties = clientProperties;
         this.jdbcTemplate = jdbcTemplate;
         this.xmlMapper = xmlMapper;
-
-        this.returnUrl = clientProperties.getRegistration().get(CABINET_CLIENT_NAME).getRedirectUri();
 
         this.registerProfileJdbcCall = new SimpleJdbcCall(jdbcTemplate.getJdbcTemplate())
                 .withoutProcedureColumnMetaDataAccess()
@@ -101,6 +97,9 @@ public class CabinetProfileServiceImpl implements CabinetProfileService {
 
     @Override
     public CabinetAuthorizationDto getCabinetAuthorizationCode(String providerAlias, String clientAlias, String providerAuthorizationCode) {
+        //TODO should we also have clientPath here?
+        String returnUrl = clientProperties.getRegistration().get(clientAlias).getRedirectUri();
+
         AccessTokenDto esiaAccessTokenDto = oauth2Flow.getAccessToken(providerAuthorizationCode, returnUrl);
 
         Jwt<Header, Claims> accessTokenJwt = parseAndCheckAccessTokenJwt(esiaAccessTokenDto.getAccessToken());
