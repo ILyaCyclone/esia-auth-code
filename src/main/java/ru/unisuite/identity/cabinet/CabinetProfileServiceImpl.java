@@ -24,7 +24,8 @@ import ru.unisuite.identity.service.PersonalDataService;
 
 import javax.annotation.PostConstruct;
 import java.sql.Types;
-import java.util.*;
+import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -33,7 +34,6 @@ public class CabinetProfileServiceImpl implements CabinetProfileService {
     private static final Logger logger = LoggerFactory.getLogger(CabinetProfileServiceImpl.class);
 
     private static final String CABINET_CLIENT_NAME = "cabinet";
-    private static final String ESIA_AUTH_PROVIDER_NAME = "esia";
 
     private final Oauth2Flow oauth2Flow;
     private final PersonalDataService personalDataService;
@@ -49,7 +49,7 @@ public class CabinetProfileServiceImpl implements CabinetProfileService {
 
     private final JwtHeaderCheck[] accessTokenChecks = new JwtHeaderCheck[]{
             new JwtHeaderCheck("typ", "JWT")
-            , new JwtHeaderCheck("alg", "RS256")
+            , new JwtHeaderCheck("alg", "RS256") //TODO get algorithm from properties
             , new JwtHeaderCheck("sbt", "access")
     };
 
@@ -72,8 +72,6 @@ public class CabinetProfileServiceImpl implements CabinetProfileService {
     private final SimpleJdbcCall registerProfileJdbcCall;
 
 
-    private final Map<String, Object> createAuthCodeCommonParams;
-
     public CabinetProfileServiceImpl(Oauth2Flow oauth2Flow, PersonalDataService personalDataService,
                                      EsiaPublicKeyProvider esiaPublicKeyProvider, EsiaProperties esiaProperties, ClientProperties clientProperties,
                                      NamedParameterJdbcTemplate jdbcTemplate, XmlMapper xmlMapper) {
@@ -87,20 +85,6 @@ public class CabinetProfileServiceImpl implements CabinetProfileService {
 
         this.returnUrl = clientProperties.getRegistration().get(CABINET_CLIENT_NAME).getRedirectUri();
 
-//        this.getCabinetAuthorizationCodeJdbcCall = new SimpleJdbcCall(jdbcTemplate.getJdbcTemplate())
-//                .withoutProcedureColumnMetaDataAccess()
-////                .withSchemaName("mwpr1")
-//                .withCatalogName("wpms2_auth_wp")
-//                .withFunctionName("create_access_token")
-////                .withReturnValue()
-//                .withNamedBinding()
-//                .declareParameters(
-//                        new SqlParameter("A_provider_user_id", Types.BIGINT)
-//                        , new SqlParameter("A_auth_provider", Types.VARCHAR)
-//                        , new SqlParameter("A_app_logical_name", Types.VARCHAR)
-//                        , new SqlParameter("A_provider_access_token", Types.VARCHAR)
-//                );
-
         this.registerProfileJdbcCall = new SimpleJdbcCall(jdbcTemplate.getJdbcTemplate())
                 .withoutProcedureColumnMetaDataAccess()
                 .withSchemaName("pilot")
@@ -113,27 +97,23 @@ public class CabinetProfileServiceImpl implements CabinetProfileService {
                         , new SqlParameter("A_log_request", Types.CLOB)
                 );
 
-        Map<String, Object> createAuthCodeCommonParamsLocal = new HashMap<>();
-        createAuthCodeCommonParamsLocal.put("A_auth_provider", ESIA_AUTH_PROVIDER_NAME);
-        createAuthCodeCommonParamsLocal.put("A_app_logical_name", CABINET_CLIENT_NAME);
-        this.createAuthCodeCommonParams = Collections.unmodifiableMap(createAuthCodeCommonParamsLocal);
     }
 
     @Override
-    public CabinetAuthorizationDto getCabinetAuthorizationCode(String esiaAuthorizationCode) {
-        AccessTokenDto esiaAccessTokenDto = oauth2Flow.getAccessToken(esiaAuthorizationCode, returnUrl);
+    public CabinetAuthorizationDto getCabinetAuthorizationCode(String providerAlias, String clientAlias, String providerAuthorizationCode) {
+        AccessTokenDto esiaAccessTokenDto = oauth2Flow.getAccessToken(providerAuthorizationCode, returnUrl);
 
         Jwt<Header, Claims> accessTokenJwt = parseAndCheckAccessTokenJwt(esiaAccessTokenDto.getAccessToken());
 
         long oid = extractOidFromAccessTokenJwt(accessTokenJwt);
 
-        boolean profileRegistrationRequired = checkProfileRegistrationRequired(oid);
+        boolean profileRegistrationRequired = checkProfileRegistrationRequired(providerAlias, oid);
 
         if (profileRegistrationRequired) {
             registerProfile(oid, esiaAccessTokenDto, "");
         }
 
-        String cabinetAuthorizationCode = getCabinetAuthorizationCode(oid, esiaAccessTokenDto);
+        String cabinetAuthorizationCode = getCabinetAuthorizationCode(providerAlias, clientAlias, oid, esiaAccessTokenDto);
 
         return new CabinetAuthorizationDto(oid, cabinetAuthorizationCode);
     }
@@ -170,6 +150,7 @@ public class CabinetProfileServiceImpl implements CabinetProfileService {
 
 
     private Long extractOidFromAccessTokenJwt(Jwt<Header, Claims> accessTokenJwt) {
+        //TODO this assumes that authprovider is esia, won't work for different
         try {
             return accessTokenJwt.getBody().get("urn:esia:sbj_id", Long.class);
         } catch (Exception e) {
@@ -188,13 +169,14 @@ public class CabinetProfileServiceImpl implements CabinetProfileService {
         }
     }
 
-    private String getCabinetAuthorizationCode(long oid, AccessTokenDto providerAccessTokenDto) {
-        SqlParameterSource params = new MapSqlParameterSource(createAuthCodeCommonParams)
+    private String getCabinetAuthorizationCode(String providerAlias, String clientAlias, long oid, AccessTokenDto providerAccessTokenDto) {
+        SqlParameterSource params = new MapSqlParameterSource()
+                .addValue("A_auth_provider", providerAlias)
+                .addValue("A_app_logical_name", clientAlias)
                 .addValue("A_provider_user_id", oid)
                 .addValue("A_provider_access_token", providerAccessTokenDto.getAccessToken());
 
         try {
-//        return getCabinetAuthorizationCodeJdbcCall.executeFunction(String.class, params);
             return jdbcTemplate.queryForObject(CABINET_AUTH_CODE_SQL, params, String.class);
         } catch (DataAccessException e) {
             throw new CabinetProfileServiceException("Could not getCabinetAuthorizationCode {oid=" + oid + '}', e);
@@ -242,12 +224,12 @@ public class CabinetProfileServiceImpl implements CabinetProfileService {
 
 
 
-    private boolean checkProfileRegistrationRequired(long oid) {
+    private boolean checkProfileRegistrationRequired(String providerAlias, long oid) {
         String sql = "select wpms2_auth_wp.need_request_profile(A_provider_user_id => :oid, A_auth_provider => :auth_provider) from dual";
 
         SqlParameterSource params = new MapSqlParameterSource()
                 .addValue("oid", oid)
-                .addValue("auth_provider", ESIA_AUTH_PROVIDER_NAME);
+                .addValue("auth_provider", providerAlias);
 
         try {
             return Integer.valueOf(1).equals(jdbcTemplate.queryForObject(sql, params, Integer.class));

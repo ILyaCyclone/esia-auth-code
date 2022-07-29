@@ -28,6 +28,8 @@ public class OAuth2LoginAuthenticationController {
     @GetMapping("/login/oauth2/code/{provider}")
     public RedirectView redirectToClientApplication(@PathVariable("provider") String identityProviderAliasParam
             , @RequestParam("client") String clientApplicationAliasParam
+            , @RequestParam(value = "client-path", required = false) String clientApplicationPath
+
             , @RequestParam(name = "code", required = false) String authorizationCode
             , @RequestParam(name = "error", required = false) String error
             , @RequestParam(name = "error_description", required = false) String errorDescription) {
@@ -49,14 +51,21 @@ public class OAuth2LoginAuthenticationController {
                     + "'. Description: '" + errorDescription + "'.");
         }
 
-        CabinetAuthorizationDto cabinetAuthorizationCodeDto = cabinetProfileService.getCabinetAuthorizationCode(authorizationCode);
+        CabinetAuthorizationDto cabinetAuthorizationCodeDto = cabinetProfileService
+                .getCabinetAuthorizationCode(identityProviderAliasParam, clientApplicationAliasParam, authorizationCode);
 
-        String cabinetUrl = UriComponentsBuilder.fromHttpUrl(clientRegistration.getRedirectUri())
+        UriComponentsBuilder clientApplicationUrlBuilder = UriComponentsBuilder.fromHttpUrl(clientRegistration.getRedirectUri())
                 .queryParam("token", cabinetAuthorizationCodeDto.getAuthorizationCode())
                 .queryParam("userId", cabinetAuthorizationCodeDto.getEsiaOid())
-                .queryParam("provider", "esia").toUriString();
+                .queryParam("provider", identityProviderAliasParam);
 
-        return new RedirectView(cabinetUrl);
+        if (StringUtils.hasText(clientApplicationPath)) {
+            clientApplicationUrlBuilder.queryParam("path", clientApplicationPath);
+        }
+
+        String clientApplicationUrl = clientApplicationUrlBuilder.toUriString();
+
+        return new RedirectView(clientApplicationUrl);
     }
 
 }

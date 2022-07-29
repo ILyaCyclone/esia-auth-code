@@ -9,7 +9,8 @@ esia:
 
   scopes: fullname, birthdate, gender, snils, id_doc, email, mobile
 
-  base-url: http://localhost:${server.port}${server.servlet.context-path}
+  #  base-url: http://localhost:${server.port}${server.servlet.context-path}
+  base-url: http://10.242.101.40:${server.port}${server.servlet.context-path}
 
 
   client-id: ${ESIA_CLIENT_ID}
@@ -22,7 +23,9 @@ esia:
     registration:
       cabinet:
         #        redirect-uri: http://wl3n3.miit.ru:7003/cabinet/token_auth_callback
-        redirect-uri: http://127.0.0.1:7101/CabinetMain-CabinetViewController-context-root/token_auth_callback
+        redirect-uri: http://10.242.101.40:7101/CabinetMain-CabinetViewController-context-root/token_auth_callback
+      report-service:
+        redirect-uri: http://127.0.0.1:8080/report/token_auth_callback
 
 #  logging:
 #    console:
